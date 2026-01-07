@@ -31,5 +31,15 @@ A hybrid transaction categorization service for Firefly III.
     ```
 3.  Open `http://localhost:8000` in your browser.
 
+## Docker
+
+1.  Build and run with Docker Compose:
+    ```bash
+    docker-compose up --build -d
+    ```
+2.  Open `http://localhost:8000`.
+
+The `/app/data` volume is used to persist learned categories/models.
+
 ## Integration
 *   **Webhooks**: Configure Firefly III to send webhooks to `http://<your-ip>:8000/webhook/firefly` (JSON format).

@@ -1,0 +1,14 @@
+services:
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      # Pass through environment variables
+      - FIREFLY_URL=${FIREFLY_URL}
+      - FIREFLY_TOKEN=${FIREFLY_TOKEN}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    volumes:
+      # Persist the Models and Memory
+      - ./data:/app/data
+    restart: unless-stopped
