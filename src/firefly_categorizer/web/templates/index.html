@@ -7,6 +7,26 @@
     <title>Firefly Categorizer</title>
     <!-- Use simple CSS or Tailwind via CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border-left-color: #4f46e5;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
 </head>
 
 <body class="bg-gray-100 text-gray-800">
@@ -33,7 +53,10 @@
 
         <!-- Transactions List -->
         <div class="bg-white p-4 rounded shadow">
-            <h2 class="text-xl font-semibold mb-4">Uncategorized Transactions</h2>
+            <h2 class="text-xl font-semibold mb-4 flex justify-between items-center">
+                Uncategorized Transactions
+                <div id="loading-spinner" class="spinner" style="display: none;"></div>
+            </h2>
             <div class="overflow-x-auto">
                 <table class="min-w-full table-auto">
                     <thead>
@@ -46,50 +69,208 @@
                             <th class="p-2">Actions</th>
                         </tr>
                     </thead>
-                    <tbody>
-                        {% if not transactions %}
-                        <tr>
-                            <td colspan="6" class="p-4 text-center text-gray-500">No transactions found (or API not
-                                configured)</td>
-                        </tr>
-                        {% endif %}
-
-                        {% for t in transactions %}
-                        <tr class="border-b hover:bg-gray-50">
-                            <td class="p-2">{{ t.date_formatted }}</td>
-                            <td class="p-2">{{ t.description }}</td>
-                            <td class="p-2">{{ t.amount }} {{ t.currency }}</td>
-                            <td class="p-2">
-                                {% if t.prediction %}
-                                <span class="font-bold text-indigo-600">{{ t.prediction.category.name }}</span>
-                                {% else %}
-                                <span class="text-gray-400">Unknown</span>
-                                {% endif %}
-                            </td>
-                            <td class="p-2">
-                                {% if t.prediction %}
-                                {{ "%.2f"|format(t.prediction.confidence) }}
-                                {% else %}
-                                -
-                                {% endif %}
-                            </td>
-                            <td class="p-2">
-                                <!-- Action Buttons -->
-                                <button onclick="categorize('{{ t.id }}')"
-                                    class="bg-green-500 text-white px-2 py-1 rounded text-xs ml-2">Confirm</button>
-                            </td>
-                        </tr>
-                        {% endfor %}
+                    <tbody id="transactions-body">
+                        <!-- Populated by JS -->
                     </tbody>
                 </table>
+                <div id="no-data-message" class="hidden p-4 text-center text-gray-500">
+                    No transactions found (or still loading...)
+                </div>
             </div>
         </div>
     </div>
 
+    <!-- Pass categories to JS -->
     <script>
-        async function categorize(transactionId) {
-            // Placeholder for JS logic to call API
-            alert("Categorize functionality to be implemented for " + transactionId);
+        // Depending on Jinja config, tojson might be needed or raw list might work if simple strings
+        // We use a safe fallback if tojson isn't available by trying to parse the raw python list string representations (single quotes to double)
+        // ideally backend passes json string, but let's try to assume safe output
+        const CATEGORIES = {{ categories | tojson }}; 
+    </script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchTransactions();
+        });
+
+        async function fetchTransactions() {
+            const spinner = document.getElementById('loading-spinner');
+            const tbody = document.getElementById('transactions-body');
+            const noData = document.getElementById('no-data-message');
+
+            spinner.style.display = 'block';
+            tbody.innerHTML = '';
+            noData.classList.add('hidden');
+
+            const params = new URLSearchParams(window.location.search);
+
+            try {
+                const response = await fetch(`/api/transactions?${params.toString()}`);
+                const transactions = await response.json();
+
+                spinner.style.display = 'none';
+
+                if (!transactions || transactions.length === 0) {
+                    noData.textContent = "No transactions found.";
+                    noData.classList.remove('hidden');
+                    return;
+                }
+
+                transactions.forEach(t => {
+                    const row = document.createElement('tr');
+
+                    // Check if already categorized
+                    const isCategorized = t.existing_category ? true : false;
+
+                    row.className = isCategorized ? 'border-b bg-gray-100 text-gray-500' : 'border-b hover:bg-gray-50';
+
+                    // Prediction logic
+                    let predictionName = 'Unknown';
+                    let confidence = '-';
+                    let predictedCat = null;
+
+                    if (t.prediction) {
+                        predictionName = t.prediction.category.name;
+                        predictedCat = t.prediction.category.name;
+                        confidence = t.prediction.confidence.toFixed(2);
+                    }
+
+                    // Build Options
+                    let optionsHtml = `<option value="" disabled ${!predictedCat ? 'selected' : ''}>Select Category</option>`;
+                    CATEGORIES.forEach(cat => {
+                        // If already categorized, we might want to pre-select it or just show it disabled
+                        // But usually we just want to show the existing category name in the cell and disable controls
+                        const isSelected = (cat === predictedCat) ? 'selected' : '';
+                        optionsHtml += `<option value="${cat}" ${isSelected}>${cat}</option>`;
+                    });
+
+                    // Inputs logic
+                    const selectDisabled = isCategorized ? 'disabled' : '';
+                    const buttonDisabled = isCategorized ? 'disabled' : '';
+                    const buttonClass = isCategorized
+                        ? 'bg-gray-400 text-white px-2 py-1 rounded text-xs ml-2 cursor-not-allowed'
+                        : 'bg-indigo-600 text-white px-2 py-1 rounded text-xs ml-2 hover:bg-indigo-700';
+
+                    // Display Category Column
+                    // If categorized, show existing. Else show prediction.
+                    let categoryDisplay = '';
+                    if (isCategorized) {
+                        categoryDisplay = `<span class="font-semibold">${t.existing_category}</span> (Existing)`;
+                    } else {
+                        categoryDisplay = predictedCat
+                            ? `<span class="font-bold text-indigo-600">${predictionName}</span>`
+                            : `<span class="text-gray-400">Unknown</span>`;
+                    }
+
+                    row.innerHTML = `
+                        <td class="p-2">${t.date_formatted}</td>
+                        <td class="p-2">${t.description}</td>
+                        <td class="p-2">${t.amount} ${t.currency}</td>
+                        <td class="p-2">${categoryDisplay}</td>
+                        <td class="p-2">${isCategorized ? '-' : confidence}</td>
+                        <td class="p-2 flex items-center">
+                            <select id="cat-${t.id}" class="border rounded p-1 text-sm bg-white max-w-[150px]" ${selectDisabled}>
+                                ${optionsHtml}
+                            </select>
+                            <button id="btn-${t.id}" onclick="saveTransaction('${t.id}')"
+                                class="${buttonClass}" ${buttonDisabled}>Save</button>
+                            <!-- Store raw object strictly as a string in a data attribute or hidden div -->
+                             <input type="hidden" id="raw-${t.id}" value='${t.raw_obj}'>
+                        </td>
+                    `;
+                    tbody.appendChild(row);
+                });
+
+            } catch (error) {
+                console.error("Fetch error:", error);
+                spinner.style.display = 'none';
+                noData.textContent = "Error fetching data.";
+                noData.classList.remove('hidden');
+            }
+        }
+
+        async function saveTransaction(transactionId) {
+            const selectEl = document.getElementById(`cat-${transactionId}`);
+            // If the element doesn't exist (e.g., deleted), stop
+            if (!selectEl) return;
+
+            const categoryName = selectEl.value;
+            const btn = document.getElementById(`btn-${transactionId}`);
+
+            if (!categoryName) {
+                alert("Please select a category first.");
+                return;
+            }
+
+            // Inline spinner style - smaller version
+            const spinnerHtml = `<div class="inline-block animate-spin h-4 w-4 border-2 border-indigo-500 rounded-full border-t-transparent"></div>`;
+
+            // Disable controls and show spinner
+            btn.disabled = true;
+            selectEl.disabled = true;
+            btn.innerHTML = spinnerHtml;
+            btn.className = "px-2 py-1 rounded text-xs ml-2 border border-gray-300 bg-gray-100"; // neutral look
+
+            const rawInput = document.getElementById(`raw-${transactionId}`);
+            // raw-id value is the JSON string
+            const transactionObj = JSON.parse(rawInput.value);
+
+            try {
+                const response = await fetch('/learn', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        transaction: transactionObj,
+                        category: { name: categoryName },
+                        transaction_id: transactionId
+                    })
+                });
+
+                if (response.ok) {
+                    const row = selectEl.closest('tr');
+
+                    // Parse response to check firefly update status if needed, 
+                    // but user just wants "positive response" confirmation
+                    const resData = await response.json();
+
+                    // Update UI to "Categorized" state
+                    row.className = 'border-b bg-gray-100 text-gray-500';
+
+                    // Update Category Column
+                    // Find the category cell (4th column, index 3)
+                    const catCell = row.cells[3];
+                    catCell.innerHTML = `<span class="font-semibold">${categoryName}</span> (Saved)`;
+
+                    // Update Confidence Column
+                    const confCell = row.cells[4];
+                    confCell.innerHTML = '-';
+
+                    // Update Actions Column
+                    // Disable select and button permanently
+                    btn.remove(); // Remove button or hide it
+                    selectEl.disabled = true;
+
+                    // Optional: remove spinner if we kept the button, but we removed it.
+                    console.log("Learned and updated!");
+                } else {
+                    // Revert state on failure
+                    alert("Failed to update.");
+                    btn.disabled = false;
+                    selectEl.disabled = false;
+                    btn.innerHTML = "Save";
+                    btn.className = "bg-indigo-600 text-white px-2 py-1 rounded text-xs ml-2 hover:bg-indigo-700";
+                }
+            } catch (error) {
+                console.error("Error:", error);
+                alert("An error occurred.");
+                // Revert state
+                btn.disabled = false;
+                selectEl.disabled = false;
+                btn.innerHTML = "Save";
+                btn.className = "bg-indigo-600 text-white px-2 py-1 rounded text-xs ml-2 hover:bg-indigo-700";
+            }
         }
     </script>
 </body>

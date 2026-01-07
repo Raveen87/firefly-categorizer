@@ -1,5 +1,5 @@
 import os
-from typing import Optional
+from typing import Optional, List
 from openai import OpenAI
 from firefly_categorizer.models import Transaction, CategorizationResult, Category
 from .base import Classifier
@@ -9,15 +9,21 @@ class LLMClassifier(Classifier):
         self.client = OpenAI(api_key=api_key or os.getenv("OPENAI_API_KEY"))
         self.model = model
 
-    def classify(self, transaction: Transaction) -> Optional[CategorizationResult]:
+    def classify(self, transaction: Transaction, valid_categories: Optional[List[str]] = None) -> Optional[CategorizationResult]:
         try:
+            prompt_categories = ""
+            if valid_categories:
+                cats_str = ", ".join(valid_categories)
+                prompt_categories = f"\nUse ONLY one of the following categories: {cats_str}"
+
             prompt = f"""
             Categorize this financial transaction into a standard personal finance category.
             Transaction: {transaction.description}
             Amount: {transaction.amount} {transaction.currency}
             Date: {transaction.date}
+            {prompt_categories}
             
-            Return ONLY the category name. If unsure, return 'Uncategorized'.
+            Return ONLY the category name. If unsure or if it doesn't fit any valid category, return 'Uncategorized'.
             """
             
             response = self.client.chat.completions.create(
@@ -30,6 +36,10 @@ class LLMClassifier(Classifier):
             )
             
             category_name = response.choices[0].message.content.strip()
+
+            if valid_categories:
+                if category_name not in valid_categories:
+                    return None
             
             # Simple heuristic for confidence (LLMs are usually confident)
             return CategorizationResult(

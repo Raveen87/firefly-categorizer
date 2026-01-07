@@ -37,7 +37,7 @@ class TfidfClassifier(Classifier):
                 "labels": self.labels
             }, f)
 
-    def classify(self, transaction: Transaction) -> Optional[CategorizationResult]:
+    def classify(self, transaction: Transaction, valid_categories: Optional[List[str]] = None) -> Optional[CategorizationResult]:
         if not self.is_fitted:
             return None
             
@@ -48,11 +48,12 @@ class TfidfClassifier(Classifier):
             category_name = self.pipeline.classes_[max_prob_idx]
 
             if confidence >= self.threshold:
-                return CategorizationResult(
-                    category=Category(name=category_name),
-                    confidence=float(confidence),
-                    source="tfidf"
-                )
+                if valid_categories is None or category_name in valid_categories:
+                    return CategorizationResult(
+                        category=Category(name=category_name),
+                        confidence=float(confidence),
+                        source="tfidf"
+                    )
         except Exception:
             # Handle cases where vocabulary might not match, though Tfidf handles this gracefully mainly
             pass

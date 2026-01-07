@@ -3,14 +3,18 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
-from models import Transaction, Category, CategorizationResult
-from manager import CategorizerService
-from integration.firefly import FireflyClient
+from firefly_categorizer.models import Transaction, Category, CategorizationResult
+from firefly_categorizer.manager import CategorizerService
+from firefly_categorizer.integration.firefly import FireflyClient
 from typing import List, Optional
 import os
 import uvicorn
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 # Global service instance
 service: Optional[CategorizerService] = None
@@ -22,6 +26,14 @@ async def lifespan(app: FastAPI):
     global service, firefly
     # Initialize service on startup
     print("Initializing services...")
+    
+    # Check Environment Variables
+    if not os.getenv("FIREFLY_URL") or not os.getenv("FIREFLY_TOKEN"):
+        print("WARNING: FIREFLY_URL or FIREFLY_TOKEN not set. Firefly integration will be disabled.")
+    
+    if not os.getenv("OPENAI_API_KEY"):
+        print("INFO: OPENAI_API_KEY not set. OpenAI integration will be disabled.")
+
     service = CategorizerService(data_dir=".")
     firefly = FireflyClient() # Will use env vars
     print("Services initialized.")
@@ -42,37 +54,69 @@ class CategorizeRequest(BaseModel):
 class LearnRequest(BaseModel):
     transaction: Transaction
     category: Category
+    transaction_id: Optional[str] = None
 
 @app.post("/categorize", response_model=Optional[CategorizationResult])
 async def categorize_transaction(req: CategorizeRequest):
     if not service:
         raise HTTPException(status_code=500, detail="Service not initialized")
-    return service.categorize(req.transaction)
+    
+    valid_cats = None
+    if firefly:
+        # Fetch valid categories to constrain prediction
+        raw_cats = await firefly.get_categories()
+        if raw_cats:
+            valid_cats = [c["attributes"]["name"] for c in raw_cats]
+
+    return service.categorize(req.transaction, valid_categories=valid_cats)
+
+@app.get("/categories")
+async def get_categories():
+    if not firefly:
+        return []
+    raw = await firefly.get_categories()
+    return [c["attributes"]["name"] for c in raw]
 
 @app.post("/learn")
 async def learn_transaction(req: LearnRequest):
     if not service:
         raise HTTPException(status_code=500, detail="Service not initialized")
+    
+    # 1. Update Local Models
     service.learn(req.transaction, req.category)
-    return {"status": "success", "message": "Learned new transaction"}
+    
+    # 2. Update Firefly III (if ID provided)
+    firefly_update_status = "skipped"
+    if firefly and req.transaction_id:
+        success = await firefly.update_transaction(req.transaction_id, req.category.name)
+        firefly_update_status = "success" if success else "failed"
 
-@app.get("/", response_class=HTMLResponse)
-async def index(request: Request, start_date: str = None, end_date: str = None):
+    return {
+        "status": "success", 
+        "message": "Learned new transaction",
+        "firefly_update": firefly_update_status
+    }
+
+@app.get("/api/transactions")
+async def get_transactions(start_date: str = None, end_date: str = None):
     transactions_display = []
+    category_list = []
     
     if firefly:
+        # Fetch categories to validate predictions
+        raw_cats = await firefly.get_categories()
+        category_list = sorted([c["attributes"]["name"] for c in raw_cats])
+
         # Default dates: last 30 days
         if not start_date:
             s_date = datetime.now() - timedelta(days=30)
             start_date_obj = s_date
-            start_date = s_date.strftime("%Y-%m-%d")
         else:
             start_date_obj = datetime.strptime(start_date, "%Y-%m-%d")
 
         if not end_date:
             e_date = datetime.now()
             end_date_obj = e_date
-            end_date = e_date.strftime("%Y-%m-%d")
         else:
             end_date_obj = datetime.strptime(end_date, "%Y-%m-%d")
 
@@ -84,6 +128,7 @@ async def index(request: Request, start_date: str = None, end_date: str = None):
             amount = float(attrs.get("amount", 0.0))
             curr = attrs.get("currency_code", "EUR")
             date_str = attrs.get("date", "")
+            existing_cat = attrs.get("category_name") # May be None or string
             try:
                 dt = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
             except ValueError:
@@ -96,8 +141,8 @@ async def index(request: Request, start_date: str = None, end_date: str = None):
                 currency=curr
             )
             
-            # Predict
-            prediction = service.categorize(tx_obj)
+            # Predict with validation
+            prediction = service.categorize(tx_obj, valid_categories=category_list if category_list else None)
             
             transactions_display.append({
                 "id": t_data.get("id"),
@@ -106,12 +151,28 @@ async def index(request: Request, start_date: str = None, end_date: str = None):
                 "amount": amount,
                 "currency": curr,
                 "prediction": prediction,
+                "existing_category": existing_cat,
                 "raw_obj": tx_obj.model_dump_json() # For JS to pick up
             })
+
+    return transactions_display
+
+@app.get("/", response_class=HTMLResponse)
+async def index(request: Request, start_date: str = None, end_date: str = None):
+    category_list = []
+    if firefly:
+        raw_cats = await firefly.get_categories()
+        category_list = sorted([c["attributes"]["name"] for c in raw_cats])
+
+    # Just setup defaults for inputs, data fetched via JS
+    if not start_date:
+        start_date = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d")
+    if not end_date:
+        end_date = datetime.now().strftime("%Y-%m-%d")
             
     return templates.TemplateResponse("index.html", {
         "request": request,
-        "transactions": transactions_display,
+        "categories": category_list,
         "start_date": start_date,
         "end_date": end_date
     })

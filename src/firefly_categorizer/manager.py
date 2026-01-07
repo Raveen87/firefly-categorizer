@@ -1,9 +1,9 @@
 from typing import Optional, List
 from firefly_categorizer.models import Transaction, CategorizationResult, Category
-from classifiers.base import Classifier
-from classifiers.memory import MemoryMatcher
-from classifiers.tfidf import TfidfClassifier
-from classifiers.llm import LLMClassifier
+from firefly_categorizer.classifiers.base import Classifier
+from firefly_categorizer.classifiers.memory import MemoryMatcher
+from firefly_categorizer.classifiers.tfidf import TfidfClassifier
+from firefly_categorizer.classifiers.llm import LLMClassifier
 import os
 
 class CategorizerService:
@@ -38,9 +38,9 @@ class CategorizerService:
             self.llm = None
             print("Warning: OPENAI_API_KEY not found. LLM classifier disabled.")
 
-    def categorize(self, transaction: Transaction) -> Optional[CategorizationResult]:
+    def categorize(self, transaction: Transaction, valid_categories: Optional[List[str]] = None) -> Optional[CategorizationResult]:
         for classifier in self.classifiers:
-            result = classifier.classify(transaction)
+            result = classifier.classify(transaction, valid_categories=valid_categories)
             if result:
                 return result
         return None

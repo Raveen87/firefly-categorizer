@@ -1,0 +1,35 @@
+# Firefly Categorizer
+
+A hybrid transaction categorization service for Firefly III.
+
+## Features
+*   **Three-way Classification**: Uses Memory (exact/fuzzy), TF-IDF (ML), and LLM (OpenAI) to categorize transactions.
+*   **Continuous Learning**: Memorizes manual corrections and retrains the ML model on the fly.
+*   **Web UI**: View recent transactions, see predictions, and manually confirm/correct categories.
+*   **Webhook Support**: Ready to receive `TRIGGERED` events from Firefly III.
+
+## Configuration
+
+1.  Copy `.env.example` to `.env`:
+    ```bash
+    cp .env.example .env
+    ```
+2.  Edit `.env` and set your credentials:
+    *   `FIREFLY_URL`: The full URL to your Firefly III instance (e.g., `http://192.168.1.100:8080`).
+    *   `FIREFLY_TOKEN`: Your Personal Access Token. Generate this in Firefly III under **Profile > OAuth / Personal Access Tokens > Create New Token**.
+    *   `OPENAI_API_KEY`: (Optional) Your OpenAI API key if you want LLM fallback.
+
+## Running
+
+1.  Install dependencies:
+    ```bash
+    uv sync
+    ```
+2.  Run the server:
+    ```bash
+    uv run python src/firefly_categorizer/main.py
+    ```
+3.  Open `http://localhost:8000` in your browser.
+
+## Integration
+*   **Webhooks**: Configure Firefly III to send webhooks to `http://<your-ip>:8000/webhook/firefly` (JSON format).

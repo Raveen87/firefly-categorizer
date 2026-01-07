@@ -1,10 +1,10 @@
 from abc import ABC, abstractmethod
-from typing import Optional
+from typing import Optional, List
 from firefly_categorizer.models import Transaction, CategorizationResult, Category
 
 class Classifier(ABC):
     @abstractmethod
-    def classify(self, transaction: Transaction) -> Optional[CategorizationResult]:
+    def classify(self, transaction: Transaction, valid_categories: Optional[List[str]] = None) -> Optional[CategorizationResult]:
         """Attempt to categorize the transaction."""
         pass
 

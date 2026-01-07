@@ -1,6 +1,6 @@
 import json
 import os
-from typing import Optional, Dict
+from typing import Optional, Dict, List
 from rapidfuzz import process, fuzz
 from firefly_categorizer.models import Transaction, CategorizationResult, Category
 from .base import Classifier
@@ -21,18 +21,25 @@ class MemoryMatcher(Classifier):
         with open(self.data_path, "w") as f:
             json.dump(self.memory, f, indent=2)
 
-    def classify(self, transaction: Transaction) -> Optional[CategorizationResult]:
+    def classify(self, transaction: Transaction, valid_categories: Optional[List[str]] = None) -> Optional[CategorizationResult]:
         if not self.memory:
             return None
+
+        # Helper to check validity
+        def is_valid(cat_name):
+            if valid_categories is None:
+                return True
+            return cat_name in valid_categories
 
         # 1. Exact match
         if transaction.description in self.memory:
             category_name = self.memory[transaction.description]
-            return CategorizationResult(
-                category=Category(name=category_name),
-                confidence=1.0,
-                source="memory_exact"
-            )
+            if is_valid(category_name):
+                return CategorizationResult(
+                    category=Category(name=category_name),
+                    confidence=1.0,
+                    source="memory_exact"
+                )
 
         # 2. Fuzzy match
         # Extract best match from memory keys
@@ -46,11 +53,12 @@ class MemoryMatcher(Classifier):
             match_description, score, _ = result
             if score >= self.threshold:
                 category_name = self.memory[match_description]
-                return CategorizationResult(
-                    category=Category(name=category_name),
-                    confidence=score / 100.0,
-                    source="memory_fuzzy"
-                )
+                if is_valid(category_name):
+                    return CategorizationResult(
+                        category=Category(name=category_name),
+                        confidence=score / 100.0,
+                        source="memory_fuzzy"
+                    )
 
         return None
 
