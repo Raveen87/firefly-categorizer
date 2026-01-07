@@ -155,11 +155,19 @@
                     // If categorized, show existing. Else show prediction.
                     let categoryDisplay = '';
                     if (isCategorized) {
-                        categoryDisplay = `<span class="font-semibold">${t.existing_category}</span> (Existing)`;
+                        categoryDisplay = `<span class="font-semibold">${t.existing_category}</span> <span class="text-xs text-gray-400">(Existing)</span>`;
+                    } else if (predictedCat) {
+                        // Source indicator mapping
+                        const sourceLabels = {
+                            'memory_exact': 'M',
+                            'memory_fuzzy': 'M~',
+                            'tfidf': 'ML',
+                            'llm': 'AI'
+                        };
+                        const sourceLabel = sourceLabels[t.prediction.source] || t.prediction.source;
+                        categoryDisplay = `<span class="font-bold text-indigo-600">${predictionName}</span> <span class="text-xs text-gray-400 ml-1" title="${t.prediction.source}">[${sourceLabel}]</span>`;
                     } else {
-                        categoryDisplay = predictedCat
-                            ? `<span class="font-bold text-indigo-600">${predictionName}</span>`
-                            : `<span class="text-gray-400">Unknown</span>`;
+                        categoryDisplay = `<span class="text-gray-400">Unknown</span>`;
                     }
 
                     row.innerHTML = `
@@ -172,7 +180,7 @@
                             <select id="cat-${t.id}" class="border rounded p-1 text-sm bg-white max-w-[150px]" ${selectDisabled}>
                                 ${optionsHtml}
                             </select>
-                            <button id="btn-${t.id}" onclick="saveTransaction('${t.id}')"
+                            <button id="btn-${t.id}" onclick="saveTransaction('${t.id}', '${predictedCat || ''}')"
                                 class="${buttonClass}" ${buttonDisabled}>Save</button>
                             <!-- Store raw object strictly as a string in a data attribute or hidden div -->
                              <input type="hidden" id="raw-${t.id}" value='${t.raw_obj}'>
@@ -189,7 +197,7 @@
             }
         }
 
-        async function saveTransaction(transactionId) {
+        async function saveTransaction(transactionId, suggestedCategory) {
             const selectEl = document.getElementById(`cat-${transactionId}`);
             // If the element doesn't exist (e.g., deleted), stop
             if (!selectEl) return;
@@ -224,7 +232,8 @@
                     body: JSON.stringify({
                         transaction: transactionObj,
                         category: { name: categoryName },
-                        transaction_id: transactionId
+                        transaction_id: transactionId,
+                        suggested_category: suggestedCategory || null
                     })
                 });
 

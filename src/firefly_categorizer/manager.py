@@ -32,17 +32,29 @@ class CategorizerService:
         # Only add if API key is present
         api_key = os.getenv("OPENAI_API_KEY")
         if api_key:
-            self.llm = LLMClassifier(api_key=api_key)
+            model = os.getenv("OPENAI_MODEL", "gpt-3.5-turbo")
+            base_url = os.getenv("OPENAI_BASE_URL")
+            self.llm = LLMClassifier(api_key=api_key, model=model, base_url=base_url)
             self.classifiers.append(self.llm)
+            print(f"LLM Classifier enabled: model={model}, base_url={base_url or 'default'}")
         else:
             self.llm = None
             print("Warning: OPENAI_API_KEY not found. LLM classifier disabled.")
 
     def categorize(self, transaction: Transaction, valid_categories: Optional[List[str]] = None) -> Optional[CategorizationResult]:
         for classifier in self.classifiers:
+            classifier_name = classifier.__class__.__name__
+            print(f"[DEBUG] Trying {classifier_name} for: '{transaction.description[:50]}...'")
+            
             result = classifier.classify(transaction, valid_categories=valid_categories)
+            
             if result:
+                print(f"[DEBUG] {classifier_name} returned: '{result.category.name}' (confidence: {result.confidence:.2f})")
                 return result
+            else:
+                print(f"[DEBUG] {classifier_name} returned: None")
+        
+        print(f"[DEBUG] No classifier matched for: '{transaction.description[:50]}...'")
         return None
 
     def learn(self, transaction: Transaction, category: Category):

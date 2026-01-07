@@ -5,8 +5,11 @@ from firefly_categorizer.models import Transaction, CategorizationResult, Catego
 from .base import Classifier
 
 class LLMClassifier(Classifier):
-    def __init__(self, api_key: str = None, model: str = "gpt-3.5-turbo"):
-        self.client = OpenAI(api_key=api_key or os.getenv("OPENAI_API_KEY"))
+    def __init__(self, api_key: str = None, model: str = "gpt-3.5-turbo", base_url: str = None):
+        self.client = OpenAI(
+            api_key=api_key or os.getenv("OPENAI_API_KEY"),
+            base_url=base_url or os.getenv("OPENAI_BASE_URL") or None
+        )
         self.model = model
 
     def classify(self, transaction: Transaction, valid_categories: Optional[List[str]] = None) -> Optional[CategorizationResult]:

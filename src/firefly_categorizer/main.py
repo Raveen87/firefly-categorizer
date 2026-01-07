@@ -55,6 +55,7 @@ class LearnRequest(BaseModel):
     transaction: Transaction
     category: Category
     transaction_id: Optional[str] = None
+    suggested_category: Optional[str] = None  # What the model suggested
 
 @app.post("/categorize", response_model=Optional[CategorizationResult])
 async def categorize_transaction(req: CategorizeRequest):
@@ -82,6 +83,13 @@ async def learn_transaction(req: LearnRequest):
     if not service:
         raise HTTPException(status_code=500, detail="Service not initialized")
     
+    # Determine if this was model-suggested or manual
+    is_model_suggested = req.suggested_category and req.suggested_category == req.category.name
+    source = "model" if is_model_suggested else "manual"
+    
+    # Log the categorization
+    print(f"[CATEGORIZE] Transaction ID: {req.transaction_id or 'N/A'} -> Category: '{req.category.name}' (Source: {source})")
+    
     # 1. Update Local Models
     service.learn(req.transaction, req.category)
     
@@ -94,7 +102,8 @@ async def learn_transaction(req: LearnRequest):
     return {
         "status": "success", 
         "message": "Learned new transaction",
-        "firefly_update": firefly_update_status
+        "firefly_update": firefly_update_status,
+        "source": source
     }
 
 @app.get("/api/transactions")
@@ -141,8 +150,10 @@ async def get_transactions(start_date: str = None, end_date: str = None):
                 currency=curr
             )
             
-            # Predict with validation
-            prediction = service.categorize(tx_obj, valid_categories=category_list if category_list else None)
+            # Only predict if not already categorized
+            prediction = None
+            if not existing_cat:
+                prediction = service.categorize(tx_obj, valid_categories=category_list if category_list else None)
             
             transactions_display.append({
                 "id": t_data.get("id"),
