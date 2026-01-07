@@ -155,7 +155,8 @@
                     // If categorized, show existing. Else show prediction.
                     let categoryDisplay = '';
                     if (isCategorized) {
-                        categoryDisplay = `<span class="font-semibold">${t.existing_category}</span> <span class="text-xs text-gray-400">(Existing)</span>`;
+                        const autoLabel = t.auto_approved ? '<span class="text-xs text-green-600 ml-1">(Auto)</span>' : '<span class="text-xs text-gray-400">(Existing)</span>';
+                        categoryDisplay = `<span class="font-semibold">${t.existing_category}</span> ${autoLabel}`;
                     } else if (predictedCat) {
                         // Source indicator mapping
                         const sourceLabels = {

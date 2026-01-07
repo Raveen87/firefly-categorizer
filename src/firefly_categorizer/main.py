@@ -131,6 +131,9 @@ async def get_transactions(start_date: str = None, end_date: str = None):
 
         raw_txs = await firefly.get_transactions(start_date=start_date_obj, end_date=end_date_obj)
         
+        # Get auto-approve threshold from env (0 = disabled)
+        auto_approve_threshold = float(os.getenv("AUTO_APPROVE_THRESHOLD", "0"))
+        
         for t_data in raw_txs:
             attrs = t_data.get("attributes", {}).get("transactions", [{}])[0]
             desc = attrs.get("description", "")
@@ -138,6 +141,7 @@ async def get_transactions(start_date: str = None, end_date: str = None):
             curr = attrs.get("currency_code", "EUR")
             date_str = attrs.get("date", "")
             existing_cat = attrs.get("category_name") # May be None or string
+            tx_id = t_data.get("id")
             try:
                 dt = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
             except ValueError:
@@ -152,17 +156,31 @@ async def get_transactions(start_date: str = None, end_date: str = None):
             
             # Only predict if not already categorized
             prediction = None
+            auto_approved = False
             if not existing_cat:
                 prediction = service.categorize(tx_obj, valid_categories=category_list if category_list else None)
+                
+                # Auto-approve if confidence exceeds threshold
+                if prediction and auto_approve_threshold > 0 and prediction.confidence >= auto_approve_threshold:
+                    print(f"[AUTO-APPROVE] Transaction {tx_id}: '{prediction.category.name}' (confidence: {prediction.confidence:.2f} >= {auto_approve_threshold})")
+                    # Update Firefly
+                    success = await firefly.update_transaction(tx_id, prediction.category.name)
+                    if success:
+                        # Learn from this auto-approval
+                        service.learn(tx_obj, prediction.category)
+                        existing_cat = prediction.category.name  # Mark as categorized
+                        auto_approved = True
+                        prediction = None  # Clear prediction since it's now saved
             
             transactions_display.append({
-                "id": t_data.get("id"),
+                "id": tx_id,
                 "date_formatted": dt.strftime("%Y-%m-%d"),
                 "description": desc,
                 "amount": amount,
                 "currency": curr,
                 "prediction": prediction,
                 "existing_category": existing_cat,
+                "auto_approved": auto_approved,
                 "raw_obj": tx_obj.model_dump_json() # For JS to pick up
             })
 
