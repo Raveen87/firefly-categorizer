@@ -9,8 +9,9 @@ wheels/
 # Virtual environments
 .venv
 
-# Project specific
+# User data
 memory.json
+*.pkl
 
 # Secrets and sensitive
 .env

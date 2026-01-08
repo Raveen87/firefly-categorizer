@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Train Models - Firefly Categorizer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .progress-bar {
+            transition: width 0.3s ease-in-out;
+        }
+
+        .stage-pending {
+            opacity: 0.5;
+        }
+
+        .stage-active {
+            opacity: 1;
+        }
+
+        .stage-complete {
+            opacity: 1;
+        }
+    </style>
+</head>
+
+<body class="bg-gray-100 text-gray-800">
+
+    <!-- Navigation -->
+    <nav class="bg-indigo-600 text-white shadow-lg">
+        <div class="container mx-auto px-4 py-3 flex items-center justify-between">
+            <a href="/" class="text-xl font-bold">Firefly Categorizer</a>
+            <div class="flex gap-6">
+                <a href="/" class="hover:text-indigo-200">Categorize</a>
+                <a href="/train-page" class="hover:text-indigo-200 font-medium border-b-2 border-white pb-1">Train
+                    Models</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mx-auto p-4">
+        <h1 class="text-2xl font-bold mb-6 text-gray-700">Train Models</h1>
+
+        <!-- Info Section -->
+        <div class="bg-white p-6 rounded shadow mb-6">
+            <h2 class="text-xl font-semibold mb-4 text-indigo-600">What is this?</h2>
+            <p class="text-gray-600 mb-4">
+                This feature trains the categorization models using your existing transaction history from Firefly III.
+                It fetches all transactions that already have categories assigned and uses them to teach the
+                <strong>Memory</strong> and <strong>TF-IDF</strong> classifiers.
+            </p>
+
+            <div class="bg-blue-50 border-l-4 border-blue-500 p-4 mb-4">
+                <h3 class="font-semibold text-blue-700">How it works:</h3>
+                <ul class="list-disc list-inside text-gray-600 mt-2 space-y-1">
+                    <li><strong>Memory Matcher:</strong> Stores exact transaction descriptions for instant matching</li>
+                    <li><strong>TF-IDF Classifier:</strong> Learns patterns from your categorization history using
+                        machine learning</li>
+                </ul>
+            </div>
+
+            <div class="bg-yellow-50 border-l-4 border-yellow-500 p-4">
+                <h3 class="font-semibold text-yellow-700">When to use:</h3>
+                <ul class="list-disc list-inside text-gray-600 mt-2 space-y-1">
+                    <li>First time setup - bootstrap models with your existing data</li>
+                    <li>After manually categorizing many transactions in Firefly</li>
+                    <li>After restoring from a backup or migrating to a new instance</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Training Controls -->
+        <div class="bg-white p-6 rounded shadow">
+            <h2 class="text-xl font-semibold mb-6">Training Progress</h2>
+
+            <!-- All Stages Container - shown when training starts -->
+            <div id="stages-container" class="hidden space-y-6">
+
+                <!-- Stage 1: Fetching -->
+                <div id="stage-fetching" class="stage-pending">
+                    <div class="flex items-center justify-between mb-2">
+                        <div class="flex items-center gap-2">
+                            <span id="fetch-icon" class="text-gray-400">⏳</span>
+                            <span class="font-medium text-gray-700">Step 1: Fetching Transactions</span>
+                        </div>
+                        <span id="fetch-stats" class="text-sm text-gray-500">Waiting...</span>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-3">
+                        <div id="fetch-progress" class="progress-bar bg-blue-500 h-3 rounded-full" style="width: 0%">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Stage 2: Filtering -->
+                <div id="stage-filtering" class="stage-pending">
+                    <div class="flex items-center justify-between mb-2">
+                        <div class="flex items-center gap-2">
+                            <span id="filter-icon" class="text-gray-400">⏳</span>
+                            <span class="font-medium text-gray-700">Step 2: Filtering Transactions</span>
+                        </div>
+                        <span id="filter-stats" class="text-sm text-gray-500">Waiting...</span>
+                    </div>
+                    <div id="filter-details" class="hidden flex gap-4 mt-2">
+                        <div class="bg-green-50 px-3 py-1 rounded text-sm">
+                            <span class="text-green-700 font-semibold" id="filter-categorized">0</span>
+                            <span class="text-gray-600 ml-1">with categories</span>
+                        </div>
+                        <div class="bg-gray-100 px-3 py-1 rounded text-sm">
+                            <span class="text-gray-600 font-semibold" id="filter-skipped">0</span>
+                            <span class="text-gray-500 ml-1">skipped</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Stage 3: Training -->
+                <div id="stage-training" class="stage-pending">
+                    <div class="flex items-center justify-between mb-2">
+                        <div class="flex items-center gap-2">
+                            <span id="train-icon" class="text-gray-400">⏳</span>
+                            <span class="font-medium text-gray-700">Step 3: Training Models</span>
+                        </div>
+                        <span id="train-stats" class="text-sm text-gray-500">Waiting...</span>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-3">
+                        <div id="train-progress" class="progress-bar bg-indigo-500 h-3 rounded-full" style="width: 0%">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Stage 4: Complete -->
+                <div id="stage-complete" class="hidden">
+                    <div class="bg-green-50 border border-green-200 rounded-lg p-4 mt-4">
+                        <div class="flex items-center gap-2 mb-3">
+                            <span class="text-2xl">✅</span>
+                            <span class="font-semibold text-green-700 text-lg">Training Complete!</span>
+                        </div>
+                        <div class="grid grid-cols-3 gap-4 mt-4">
+                            <div class="text-center">
+                                <div id="result-trained" class="text-2xl font-bold text-green-600">0</div>
+                                <div class="text-sm text-gray-600">Trained</div>
+                            </div>
+                            <div class="text-center">
+                                <div id="result-skipped" class="text-2xl font-bold text-gray-500">0</div>
+                                <div class="text-sm text-gray-600">Skipped</div>
+                            </div>
+                            <div class="text-center">
+                                <div id="result-total" class="text-2xl font-bold text-blue-600">0</div>
+                                <div class="text-sm text-gray-600">Total Fetched</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Error -->
+            <div id="stage-error" class="hidden mb-6">
+                <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+                    <span class="text-red-700 font-medium">❌ Error: </span>
+                    <span id="error-message" class="text-red-600"></span>
+                </div>
+            </div>
+
+            <!-- Start Button -->
+            <div class="flex items-center gap-4 mt-6">
+                <button id="train-btn" onclick="startTraining()"
+                    class="bg-indigo-600 text-white px-6 py-3 rounded-lg hover:bg-indigo-700 font-medium flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd"
+                            d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z"
+                            clip-rule="evenodd" />
+                    </svg>
+                    Start Training
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function setStageActive(stageId) {
+            const stage = document.getElementById(stageId);
+            stage.classList.remove('stage-pending');
+            stage.classList.add('stage-active');
+        }
+
+        function setStageComplete(stageId, icon) {
+            const stage = document.getElementById(stageId);
+            stage.classList.remove('stage-pending', 'stage-active');
+            stage.classList.add('stage-complete');
+            document.getElementById(stageId.replace('stage-', '') + '-icon').textContent = icon || '✅';
+        }
+
+        async function startTraining() {
+            const btn = document.getElementById('train-btn');
+
+            // Disable button
+            btn.disabled = true;
+            btn.classList.add('opacity-50', 'cursor-not-allowed');
+            btn.innerHTML = `
+                <svg class="animate-spin h-5 w-5 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Training...
+            `;
+
+            // Show stages container and reset states
+            document.getElementById('stages-container').classList.remove('hidden');
+            document.getElementById('stage-complete').classList.add('hidden');
+            document.getElementById('stage-error').classList.add('hidden');
+            document.getElementById('filter-details').classList.add('hidden');
+
+            // Reset all stages to pending
+            ['stage-fetching', 'stage-filtering', 'stage-training'].forEach(id => {
+                const stage = document.getElementById(id);
+                stage.classList.add('stage-pending');
+                stage.classList.remove('stage-active', 'stage-complete');
+            });
+
+            // Reset icons
+            document.getElementById('fetch-icon').textContent = '⏳';
+            document.getElementById('filter-icon').textContent = '⏳';
+            document.getElementById('train-icon').textContent = '⏳';
+
+            // Reset progress
+            document.getElementById('fetch-progress').style.width = '0%';
+            document.getElementById('train-progress').style.width = '0%';
+            document.getElementById('fetch-stats').textContent = 'Waiting...';
+            document.getElementById('filter-stats').textContent = 'Waiting...';
+            document.getElementById('train-stats').textContent = 'Waiting...';
+
+            // Connect to SSE endpoint
+            const eventSource = new EventSource('/train-stream');
+
+            eventSource.onmessage = function (event) {
+                const data = JSON.parse(event.data);
+
+                if (data.stage === 'fetching') {
+                    setStageActive('stage-fetching');
+                    document.getElementById('fetch-icon').textContent = '📥';
+                    document.getElementById('fetch-stats').textContent = `${data.fetched} / ${data.total} (${data.percent}%)`;
+                    document.getElementById('fetch-progress').style.width = `${data.percent}%`;
+                }
+                else if (data.stage === 'filtering') {
+                    // Complete fetching
+                    setStageComplete('stage-fetching', '✅');
+                    document.getElementById('fetch-stats').textContent = 'Done';
+                    document.getElementById('fetch-progress').style.width = '100%';
+
+                    // Activate filtering
+                    setStageActive('stage-filtering');
+                    document.getElementById('filter-icon').textContent = '🔍';
+                    document.getElementById('filter-stats').textContent = `${data.total_fetched} transactions processed`;
+                    document.getElementById('filter-details').classList.remove('hidden');
+                    document.getElementById('filter-categorized').textContent = data.categorized;
+                    document.getElementById('filter-skipped').textContent = data.skipped;
+                }
+                else if (data.stage === 'training') {
+                    // Complete filtering if not done
+                    setStageComplete('stage-filtering', '✅');
+
+                    // Activate training
+                    setStageActive('stage-training');
+                    document.getElementById('train-icon').textContent = '🧠';
+                    document.getElementById('train-stats').textContent = `${data.trained} / ${data.total} (${data.percent}%)`;
+                    document.getElementById('train-progress').style.width = `${data.percent}%`;
+                }
+                else if (data.stage === 'complete') {
+                    // Complete training
+                    setStageComplete('stage-training', '✅');
+                    document.getElementById('train-stats').textContent = 'Done';
+                    document.getElementById('train-progress').style.width = '100%';
+
+                    // Show complete section
+                    document.getElementById('stage-complete').classList.remove('hidden');
+                    document.getElementById('result-trained').textContent = data.trained;
+                    document.getElementById('result-skipped').textContent = data.skipped;
+                    document.getElementById('result-total').textContent = data.total_fetched;
+
+                    eventSource.close();
+                    resetButton();
+                }
+                else if (data.stage === 'error') {
+                    document.getElementById('stage-error').classList.remove('hidden');
+                    document.getElementById('error-message').textContent = data.message;
+
+                    eventSource.close();
+                    resetButton();
+                }
+            };
+
+            eventSource.onerror = function (error) {
+                console.error('SSE Error:', error);
+                document.getElementById('stage-error').classList.remove('hidden');
+                document.getElementById('error-message').textContent = 'Connection lost';
+                eventSource.close();
+                resetButton();
+            };
+        }
+
+        function resetButton() {
+            const btn = document.getElementById('train-btn');
+            btn.disabled = false;
+            btn.classList.remove('opacity-50', 'cursor-not-allowed');
+            btn.innerHTML = `
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd" />
+                </svg>
+                Start Training
+            `;
+        }
+    </script>
+</body>
+
+</html>

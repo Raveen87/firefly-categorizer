@@ -38,6 +38,115 @@ class FireflyClient:
                 print(f"Error fetching transactions: {e}")
                 return []
 
+    async def get_all_transactions(self, limit_per_page: int = 500) -> dict:
+        """Fetch all transactions with pagination. Returns dict with transactions and metadata."""
+        if not self.base_url or not self.token:
+            return {"transactions": [], "total": 0}
+        
+        all_transactions = []
+        page = 1
+        total_count = 0
+        total_pages = 1
+        
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            while True:
+                try:
+                    params = {
+                        "limit": limit_per_page,
+                        "page": page,
+                    }
+                    response = await client.get(
+                        f"{self.base_url}/api/v1/transactions", 
+                        headers=self.headers, 
+                        params=params
+                    )
+                    response.raise_for_status()
+                    data = response.json()
+                    transactions = data.get("data", [])
+                    
+                    if not transactions:
+                        break
+                    
+                    all_transactions.extend(transactions)
+                    
+                    # Get pagination metadata
+                    meta = data.get("meta", {}).get("pagination", {})
+                    total_count = meta.get("total", len(all_transactions))
+                    total_pages = meta.get("total_pages", 1)
+                    
+                    print(f"[TRAIN] Fetched page {page}/{total_pages}: {len(all_transactions)}/{total_count} transactions")
+                    
+                    if page >= total_pages:
+                        break
+                    
+                    page += 1
+                except Exception as e:
+                    print(f"Error fetching transactions page {page}: {e}")
+                    break
+        
+        return {
+            "transactions": all_transactions,
+            "total": total_count,
+            "pages_fetched": page
+        }
+
+    async def stream_all_transactions(self, limit_per_page: int = 500):
+        """Async generator that yields progress updates while fetching transactions."""
+        if not self.base_url or not self.token:
+            yield {"stage": "error", "message": "Firefly credentials missing"}
+            return
+        
+        all_transactions = []
+        page = 1
+        total_count = 0
+        total_pages = 1
+        
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            # First request to get total count
+            while True:
+                try:
+                    params = {"limit": limit_per_page, "page": page}
+                    response = await client.get(
+                        f"{self.base_url}/api/v1/transactions", 
+                        headers=self.headers, 
+                        params=params
+                    )
+                    response.raise_for_status()
+                    data = response.json()
+                    transactions = data.get("data", [])
+                    
+                    if not transactions:
+                        break
+                    
+                    all_transactions.extend(transactions)
+                    
+                    meta = data.get("meta", {}).get("pagination", {})
+                    total_count = meta.get("total", len(all_transactions))
+                    total_pages = meta.get("total_pages", 1)
+                    
+                    # Yield fetch progress
+                    yield {
+                        "stage": "fetching",
+                        "fetched": len(all_transactions),
+                        "total": total_count,
+                        "percent": round(len(all_transactions) / total_count * 100, 1) if total_count > 0 else 0
+                    }
+                    
+                    if page >= total_pages:
+                        break
+                    page += 1
+                    
+                except Exception as e:
+                    yield {"stage": "error", "message": str(e)}
+                    return
+        
+        # Yield final fetch complete with all transactions
+        yield {
+            "stage": "fetch_complete",
+            "transactions": all_transactions,
+            "total": total_count
+        }
+
     async def get_categories(self) -> List[dict]:
         if not self.base_url or not self.token:
             return []

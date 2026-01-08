@@ -1,8 +1,9 @@
 from fastapi import FastAPI, HTTPException, Request, Form
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, StreamingResponse
 from pydantic import BaseModel
+import json
 from firefly_categorizer.models import Transaction, Category, CategorizationResult
 from firefly_categorizer.manager import CategorizerService
 from firefly_categorizer.integration.firefly import FireflyClient
@@ -77,6 +78,142 @@ async def get_categories():
         return []
     raw = await firefly.get_categories()
     return [c["attributes"]["name"] for c in raw]
+
+@app.post("/train")
+async def train_models():
+    """
+    Train models using all existing categorized transactions from Firefly.
+    """
+    if not service:
+        raise HTTPException(status_code=500, detail="Service not initialized")
+    if not firefly:
+        raise HTTPException(status_code=500, detail="Firefly not configured")
+    
+    print("[TRAIN] Starting bulk training from Firefly data...")
+    
+    # Fetch all transactions
+    result = await firefly.get_all_transactions()
+    all_txs = result["transactions"]
+    fetched_total = result["total"]
+    
+    trained_count = 0
+    skipped_count = 0
+    
+    for t_data in all_txs:
+        attrs = t_data.get("attributes", {}).get("transactions", [{}])[0]
+        desc = attrs.get("description", "")
+        amount = float(attrs.get("amount", 0.0))
+        curr = attrs.get("currency_code", "EUR")
+        date_str = attrs.get("date", "")
+        category_name = attrs.get("category_name")
+        
+        # Skip uncategorized transactions
+        if not category_name:
+            skipped_count += 1
+            continue
+        
+        try:
+            dt = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
+        except ValueError:
+            dt = datetime.now()
+        
+        tx_obj = Transaction(
+            description=desc,
+            amount=amount,
+            date=dt,
+            currency=curr
+        )
+        
+        # Train the models
+        service.learn(tx_obj, Category(name=category_name))
+        trained_count += 1
+    
+    print(f"[TRAIN] Complete! Trained: {trained_count}, Skipped (no category): {skipped_count}")
+    
+    return {
+        "status": "success",
+        "trained": trained_count,
+        "skipped": skipped_count,
+        "total": fetched_total,
+        "fetched": len(all_txs)
+    }
+
+@app.get("/train-stream")
+async def train_stream():
+    """
+    SSE endpoint for training with real-time progress updates.
+    """
+    async def generate():
+        if not service or not firefly:
+            yield f"data: {json.dumps({'stage': 'error', 'message': 'Service not initialized'})}\n\n"
+            return
+        
+        all_transactions = []
+        total_fetched = 0
+        
+        # Stage 1: Fetching
+        yield f"data: {json.dumps({'stage': 'fetching', 'fetched': 0, 'total': 0, 'percent': 0})}\n\n"
+        
+        async for progress in firefly.stream_all_transactions():
+            if progress["stage"] == "fetching":
+                yield f"data: {json.dumps(progress)}\n\n"
+            elif progress["stage"] == "fetch_complete":
+                all_transactions = progress["transactions"]
+                total_fetched = progress["total"]
+            elif progress["stage"] == "error":
+                yield f"data: {json.dumps(progress)}\n\n"
+                return
+        
+        # Stage 2: Filtering
+        categorized_txs = []
+        skipped_count = 0
+        
+        for t_data in all_transactions:
+            attrs = t_data.get("attributes", {}).get("transactions", [{}])[0]
+            category_name = attrs.get("category_name")
+            if category_name:
+                categorized_txs.append(t_data)
+            else:
+                skipped_count += 1
+        
+        yield f"data: {json.dumps({'stage': 'filtering', 'total_fetched': total_fetched, 'categorized': len(categorized_txs), 'skipped': skipped_count})}\n\n"
+        
+        # Stage 3: Training
+        trained_count = 0
+        total_to_train = len(categorized_txs)
+        
+        for i, t_data in enumerate(categorized_txs):
+            attrs = t_data.get("attributes", {}).get("transactions", [{}])[0]
+            desc = attrs.get("description", "")
+            amount = float(attrs.get("amount", 0.0))
+            curr = attrs.get("currency_code", "EUR")
+            date_str = attrs.get("date", "")
+            category_name = attrs.get("category_name")
+            
+            try:
+                dt = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
+            except ValueError:
+                dt = datetime.now()
+            
+            tx_obj = Transaction(
+                description=desc,
+                amount=amount,
+                date=dt,
+                currency=curr
+            )
+            
+            service.learn(tx_obj, Category(name=category_name))
+            trained_count += 1
+            
+            # Yield progress every 50 transactions or at end
+            if trained_count % 50 == 0 or trained_count == total_to_train:
+                percent = round(trained_count / total_to_train * 100, 1) if total_to_train > 0 else 100
+                yield f"data: {json.dumps({'stage': 'training', 'trained': trained_count, 'total': total_to_train, 'percent': percent})}\n\n"
+        
+        # Stage 4: Complete
+        yield f"data: {json.dumps({'stage': 'complete', 'trained': trained_count, 'skipped': skipped_count, 'total_fetched': total_fetched})}\n\n"
+    
+    return StreamingResponse(generate(), media_type="text/event-stream")
 
 @app.post("/learn")
 async def learn_transaction(req: LearnRequest):
@@ -204,6 +341,12 @@ async def index(request: Request, start_date: str = None, end_date: str = None):
         "categories": category_list,
         "start_date": start_date,
         "end_date": end_date
+    })
+
+@app.get("/train-page", response_class=HTMLResponse)
+async def train_page(request: Request):
+    return templates.TemplateResponse("train.html", {
+        "request": request
     })
 
 # Firefly Webhook Endpoint
