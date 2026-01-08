@@ -2,6 +2,9 @@ import os
 import httpx
 from typing import List, Optional
 from datetime import datetime
+from firefly_categorizer.logger import get_logger
+
+logger = get_logger(__name__)
 
 class FireflyClient:
     def __init__(self, base_url: str = None, token: str = None):
@@ -15,7 +18,7 @@ class FireflyClient:
 
     async def get_transactions(self, start_date: datetime = None, end_date: datetime = None, limit: int = 50) -> List[dict]:
         if not self.base_url or not self.token:
-            print("Firefly credentials missing.")
+            logger.error("Firefly credentials missing.")
             return []
             
         async with httpx.AsyncClient() as client:
@@ -35,7 +38,7 @@ class FireflyClient:
                 data = response.json()
                 return data.get("data", [])
             except Exception as e:
-                print(f"Error fetching transactions: {e}")
+                logger.error(f"Error fetching transactions: {e}")
                 return []
 
     async def get_all_transactions(self, limit_per_page: int = 500) -> dict:
@@ -74,14 +77,14 @@ class FireflyClient:
                     total_count = meta.get("total", len(all_transactions))
                     total_pages = meta.get("total_pages", 1)
                     
-                    print(f"[TRAIN] Fetched page {page}/{total_pages}: {len(all_transactions)}/{total_count} transactions")
+                    logger.info(f"[TRAIN] Fetched page {page}/{total_pages}: {len(all_transactions)}/{total_count} transactions")
                     
                     if page >= total_pages:
                         break
                     
                     page += 1
                 except Exception as e:
-                    print(f"Error fetching transactions page {page}: {e}")
+                    logger.error(f"Error fetching transactions page {page}: {e}")
                     break
         
         return {
@@ -159,7 +162,7 @@ class FireflyClient:
                 data = response.json()
                 return data.get("data", [])
             except Exception as e:
-                print(f"Error fetching categories: {e}")
+                logger.error(f"Error fetching categories: {e}")
                 return []
 
     async def update_transaction(self, transaction_id: str, category_name: str) -> bool:
@@ -185,5 +188,5 @@ class FireflyClient:
                 response.raise_for_status()
                 return True
             except Exception as e:
-                print(f"Error updating transaction {transaction_id}: {e}")
+                logger.error(f"Error updating transaction {transaction_id}: {e}")
                 return False

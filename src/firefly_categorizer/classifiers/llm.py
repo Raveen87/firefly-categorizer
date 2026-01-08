@@ -3,6 +3,9 @@ from typing import Optional, List
 from openai import OpenAI
 from firefly_categorizer.models import Transaction, CategorizationResult, Category
 from .base import Classifier
+from firefly_categorizer.logger import get_logger
+
+logger = get_logger(__name__)
 
 class LLMClassifier(Classifier):
     def __init__(self, api_key: str = None, model: str = "gpt-3.5-turbo", base_url: str = None):
@@ -51,7 +54,7 @@ class LLMClassifier(Classifier):
                 source="llm"
             )
         except Exception as e:
-            print(f"LLM Error: {e}")
+            logger.error(f"LLM Error: {e}")
             return None
 
     def learn(self, transaction: Transaction, category: Category):

@@ -4,7 +4,10 @@ from firefly_categorizer.classifiers.base import Classifier
 from firefly_categorizer.classifiers.memory import MemoryMatcher
 from firefly_categorizer.classifiers.tfidf import TfidfClassifier
 from firefly_categorizer.classifiers.llm import LLMClassifier
+from firefly_categorizer.logger import get_logger
 import os
+
+logger = get_logger(__name__)
 
 class CategorizerService:
     def __init__(self, 
@@ -36,25 +39,25 @@ class CategorizerService:
             base_url = os.getenv("OPENAI_BASE_URL")
             self.llm = LLMClassifier(api_key=api_key, model=model, base_url=base_url)
             self.classifiers.append(self.llm)
-            print(f"LLM Classifier enabled: model={model}, base_url={base_url or 'default'}")
+            logger.info(f"LLM Classifier enabled: model={model}, base_url={base_url or 'default'}")
         else:
             self.llm = None
-            print("Warning: OPENAI_API_KEY not found. LLM classifier disabled.")
+            logger.warning("OPENAI_API_KEY not found. LLM classifier disabled.")
 
     def categorize(self, transaction: Transaction, valid_categories: Optional[List[str]] = None) -> Optional[CategorizationResult]:
         for classifier in self.classifiers:
             classifier_name = classifier.__class__.__name__
-            print(f"[DEBUG] Trying {classifier_name} for: '{transaction.description[:50]}...'")
+            logger.debug(f"Trying {classifier_name} for: '{transaction.description[:50]}...'")
             
             result = classifier.classify(transaction, valid_categories=valid_categories)
             
             if result:
-                print(f"[DEBUG] {classifier_name} returned: '{result.category.name}' (confidence: {result.confidence:.2f})")
+                logger.debug(f"{classifier_name} returned: '{result.category.name}' (confidence: {result.confidence:.2f})")
                 return result
             else:
-                print(f"[DEBUG] {classifier_name} returned: None")
+                logger.debug(f"{classifier_name} returned: None")
         
-        print(f"[DEBUG] No classifier matched for: '{transaction.description[:50]}...'")
+        logger.debug(f"No classifier matched for: '{transaction.description[:50]}...'")
         return None
 
     def learn(self, transaction: Transaction, category: Category):
@@ -71,4 +74,4 @@ class CategorizerService:
         """
         self.memory.clear()
         self.tfidf.clear()
-        print("[MANAGER] All models cleared.")
+        logger.info("All models cleared.")

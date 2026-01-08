@@ -7,6 +7,7 @@ import json
 from firefly_categorizer.models import Transaction, Category, CategorizationResult
 from firefly_categorizer.manager import CategorizerService
 from firefly_categorizer.integration.firefly import FireflyClient
+from firefly_categorizer.logger import setup_logging, get_logger, get_logging_config
 from typing import List, Optional
 import os
 import uvicorn
@@ -17,6 +18,10 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
+# Setup logging
+setup_logging()
+logger = get_logger(__name__)
+
 # Global service instance
 service: Optional[CategorizerService] = None
 firefly: Optional[FireflyClient] = None
@@ -26,20 +31,20 @@ templates = Jinja2Templates(directory=os.path.join(os.path.dirname(__file__), "w
 async def lifespan(app: FastAPI):
     global service, firefly
     # Initialize service on startup
-    print("Initializing services...")
+    logger.info("Initializing services...")
     
     # Check Environment Variables
     if not os.getenv("FIREFLY_URL") or not os.getenv("FIREFLY_TOKEN"):
-        print("WARNING: FIREFLY_URL or FIREFLY_TOKEN not set. Firefly integration will be disabled.")
+        logger.warning("FIREFLY_URL or FIREFLY_TOKEN not set. Firefly integration will be disabled.")
     
     if not os.getenv("OPENAI_API_KEY"):
-        print("INFO: OPENAI_API_KEY not set. OpenAI integration will be disabled.")
+        logger.info("OPENAI_API_KEY not set. OpenAI integration will be disabled.")
 
     service = CategorizerService(data_dir=".")
     firefly = FireflyClient() # Will use env vars
-    print("Services initialized.")
+    logger.info("Services initialized.")
     yield
-    print("Service shutting down.")
+    logger.info("Service shutting down.")
 
 app = FastAPI(title="Firefly Categorizer", lifespan=lifespan)
 
@@ -89,7 +94,7 @@ async def train_models():
     if not firefly:
         raise HTTPException(status_code=500, detail="Firefly not configured")
     
-    print("[TRAIN] Starting bulk training from Firefly data...")
+    logger.info("[TRAIN] Starting bulk training from Firefly data...")
     
     # Fetch all transactions
     result = await firefly.get_all_transactions()
@@ -128,7 +133,7 @@ async def train_models():
         service.learn(tx_obj, Category(name=category_name))
         trained_count += 1
     
-    print(f"[TRAIN] Complete! Trained: {trained_count}, Skipped (no category): {skipped_count}")
+    logger.info(f"[TRAIN] Complete! Trained: {trained_count}, Skipped (no category): {skipped_count}")
     
     return {
         "status": "success",
@@ -233,7 +238,7 @@ async def learn_transaction(req: LearnRequest):
     source = "model" if is_model_suggested else "manual"
     
     # Log the categorization
-    print(f"[CATEGORIZE] Transaction ID: {req.transaction_id or 'N/A'} -> Category: '{req.category.name}' (Source: {source})")
+    logger.info(f"[CATEGORIZE] Transaction ID: {req.transaction_id or 'N/A'} -> Category: '{req.category.name}' (Source: {source})")
     
     # 1. Update Local Models
     service.learn(req.transaction, req.category)
@@ -307,7 +312,7 @@ async def get_transactions(start_date: str = None, end_date: str = None):
                 
                 # Auto-approve if confidence exceeds threshold
                 if prediction and auto_approve_threshold > 0 and prediction.confidence >= auto_approve_threshold:
-                    print(f"[AUTO-APPROVE] Transaction {tx_id}: '{prediction.category.name}' (confidence: {prediction.confidence:.2f} >= {auto_approve_threshold})")
+                    logger.info(f"[AUTO-APPROVE] Transaction {tx_id}: '{prediction.category.name}' (confidence: {prediction.confidence:.2f} >= {auto_approve_threshold})")
                     # Update Firefly
                     success = await firefly.update_transaction(tx_id, prediction.category.name)
                     if success:
@@ -364,8 +369,8 @@ async def firefly_webhook(request: Request):
     Handle Firefly III Webhook.
     """
     data = await request.json()
-    print(f"Webhook received: {data}")
+    logger.info(f"Webhook received: {data}")
     return {"status": "received"}
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8000, log_config=get_logging_config())
