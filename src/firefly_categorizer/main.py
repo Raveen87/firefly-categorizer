@@ -215,6 +215,14 @@ async def train_stream():
     
     return StreamingResponse(generate(), media_type="text/event-stream")
 
+@app.post("/clear-models")
+async def clear_models():
+    if not service:
+        raise HTTPException(status_code=500, detail="Service not initialized")
+    
+    service.clear_models()
+    return {"status": "success", "message": "All models cleared"}
+
 @app.post("/learn")
 async def learn_transaction(req: LearnRequest):
     if not service:

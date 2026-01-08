@@ -64,3 +64,11 @@ class CategorizerService:
         # We update Memory and TF-IDF. LLM usually isn't updated this way (RAG/Fine-tuning is complex).
         self.memory.learn(transaction, category)
         self.tfidf.learn(transaction, category)
+
+    def clear_models(self):
+        """
+        Clear all local training data.
+        """
+        self.memory.clear()
+        self.tfidf.clear()
+        print("[MANAGER] All models cleared.")

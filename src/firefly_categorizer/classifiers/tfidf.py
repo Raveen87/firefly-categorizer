@@ -22,13 +22,18 @@ class TfidfClassifier(Classifier):
 
     def load(self):
         if os.path.exists(self.data_path):
-            with open(self.data_path, "rb") as f:
-                data = pickle.load(f)
-                self.examples = data.get("examples", [])
-                self.labels = data.get("labels", [])
-                if self.examples:
-                    self.pipeline.fit(self.examples, self.labels)
-                    self.is_fitted = True
+            try:
+                with open(self.data_path, "rb") as f:
+                    data = pickle.load(f)
+                    self.examples = data.get("examples", [])
+                    self.labels = data.get("labels", [])
+                    if self.examples:
+                        self.pipeline.fit(self.examples, self.labels)
+                        self.is_fitted = True
+            except (pickle.UnpicklingError, EOFError):
+                self.examples = []
+                self.labels = []
+                self.is_fitted = False
 
     def save(self):
         with open(self.data_path, "wb") as f:
@@ -70,3 +75,13 @@ class TfidfClassifier(Classifier):
             self.pipeline.fit(self.examples, self.labels)
             self.is_fitted = True
             self.save()
+
+    def clear(self):
+        self.examples = []
+        self.labels = []
+        self.is_fitted = False
+        self.pipeline = Pipeline([
+            ('tfidf', TfidfVectorizer(analyzer='char_wb', ngram_range=(3, 5), min_df=1)),
+            ('clf', SGDClassifier(loss='log_loss', random_state=42))
+        ])
+        self.save()

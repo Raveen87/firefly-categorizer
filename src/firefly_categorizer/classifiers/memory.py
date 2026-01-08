@@ -14,8 +14,11 @@ class MemoryMatcher(Classifier):
 
     def load(self):
         if os.path.exists(self.data_path):
-            with open(self.data_path, "r") as f:
-                self.memory = json.load(f)
+            try:
+                with open(self.data_path, "r") as f:
+                    self.memory = json.load(f)
+            except json.JSONDecodeError:
+                self.memory = {}
 
     def save(self):
         with open(self.data_path, "w") as f:
@@ -64,4 +67,8 @@ class MemoryMatcher(Classifier):
 
     def learn(self, transaction: Transaction, category: Category):
         self.memory[transaction.description] = category.name
+        self.save()
+
+    def clear(self):
+        self.memory = {}
         self.save()
