@@ -93,6 +93,47 @@ class FireflyClient:
             "pages_fetched": page
         }
 
+    async def yield_transactions(self, limit_per_page: int = 500):
+        """Async generator that yields pages of transactions and metadata."""
+        if not self.base_url or not self.token:
+            return
+        
+        page = 1
+        total_pages = 1
+        
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            while True:
+                try:
+                    params = {
+                        "limit": limit_per_page,
+                        "page": page,
+                    }
+                    response = await client.get(
+                        f"{self.base_url}/api/v1/transactions", 
+                        headers=self.headers, 
+                        params=params
+                    )
+                    response.raise_for_status()
+                    data = response.json()
+                    transactions = data.get("data", [])
+                    
+                    if not transactions:
+                        break
+                    
+                    # Get pagination metadata
+                    meta = data.get("meta", {}).get("pagination", {})
+                    total_pages = meta.get("total_pages", 1)
+                    
+                    yield transactions, meta
+                    
+                    if page >= total_pages:
+                        break
+                    
+                    page += 1
+                except Exception as e:
+                    logger.error(f"Error fetching transactions page {page}: {e}")
+                    break
+
     async def stream_all_transactions(self, limit_per_page: int = 500):
         """Async generator that yields progress updates while fetching transactions."""
         if not self.base_url or not self.token:

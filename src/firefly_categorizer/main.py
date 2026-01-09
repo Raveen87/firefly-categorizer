@@ -96,104 +96,25 @@ async def train_models():
     
     logger.info("[TRAIN] Starting bulk training from Firefly data...")
     
-    # Fetch all transactions
-    result = await firefly.get_all_transactions()
-    all_txs = result["transactions"]
-    fetched_total = result["total"]
-    
     trained_count = 0
     skipped_count = 0
+    total_fetched = 0
     
-    for t_data in all_txs:
-        attrs = t_data.get("attributes", {}).get("transactions", [{}])[0]
-        desc = attrs.get("description", "")
-        amount = float(attrs.get("amount", 0.0))
-        curr = attrs.get("currency_code", "EUR")
-        date_str = attrs.get("date", "")
-        category_name = attrs.get("category_name")
+    async for page_txs, _ in firefly.yield_transactions():
+        total_fetched += len(page_txs)
         
-        # Skip uncategorized transactions
-        if not category_name:
-            skipped_count += 1
-            continue
-        
-        try:
-            dt = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
-        except ValueError:
-            dt = datetime.now()
-        
-        tx_obj = Transaction(
-            description=desc,
-            amount=amount,
-            date=dt,
-            currency=curr
-        )
-        
-        # Train the models
-        service.learn(tx_obj, Category(name=category_name))
-        trained_count += 1
-    
-    logger.info(f"[TRAIN] Complete! Trained: {trained_count}, Skipped (no category): {skipped_count}")
-    
-    return {
-        "status": "success",
-        "trained": trained_count,
-        "skipped": skipped_count,
-        "total": fetched_total,
-        "fetched": len(all_txs)
-    }
-
-@app.get("/train-stream")
-async def train_stream():
-    """
-    SSE endpoint for training with real-time progress updates.
-    """
-    async def generate():
-        if not service or not firefly:
-            yield f"data: {json.dumps({'stage': 'error', 'message': 'Service not initialized'})}\n\n"
-            return
-        
-        all_transactions = []
-        total_fetched = 0
-        
-        # Stage 1: Fetching
-        yield f"data: {json.dumps({'stage': 'fetching', 'fetched': 0, 'total': 0, 'percent': 0})}\n\n"
-        
-        async for progress in firefly.stream_all_transactions():
-            if progress["stage"] == "fetching":
-                yield f"data: {json.dumps(progress)}\n\n"
-            elif progress["stage"] == "fetch_complete":
-                all_transactions = progress["transactions"]
-                total_fetched = progress["total"]
-            elif progress["stage"] == "error":
-                yield f"data: {json.dumps(progress)}\n\n"
-                return
-        
-        # Stage 2: Filtering
-        categorized_txs = []
-        skipped_count = 0
-        
-        for t_data in all_transactions:
-            attrs = t_data.get("attributes", {}).get("transactions", [{}])[0]
-            category_name = attrs.get("category_name")
-            if category_name:
-                categorized_txs.append(t_data)
-            else:
-                skipped_count += 1
-        
-        yield f"data: {json.dumps({'stage': 'filtering', 'total_fetched': total_fetched, 'categorized': len(categorized_txs), 'skipped': skipped_count})}\n\n"
-        
-        # Stage 3: Training
-        trained_count = 0
-        total_to_train = len(categorized_txs)
-        
-        for i, t_data in enumerate(categorized_txs):
+        for t_data in page_txs:
             attrs = t_data.get("attributes", {}).get("transactions", [{}])[0]
             desc = attrs.get("description", "")
             amount = float(attrs.get("amount", 0.0))
             curr = attrs.get("currency_code", "EUR")
             date_str = attrs.get("date", "")
             category_name = attrs.get("category_name")
+            
+            # Skip uncategorized transactions
+            if not category_name:
+                skipped_count += 1
+                continue
             
             try:
                 dt = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
@@ -207,15 +128,80 @@ async def train_stream():
                 currency=curr
             )
             
+            # Train the models
             service.learn(tx_obj, Category(name=category_name))
             trained_count += 1
             
-            # Yield progress every 50 transactions or at end
-            if trained_count % 50 == 0 or trained_count == total_to_train:
-                percent = round(trained_count / total_to_train * 100, 1) if total_to_train > 0 else 100
-                yield f"data: {json.dumps({'stage': 'training', 'trained': trained_count, 'total': total_to_train, 'percent': percent})}\n\n"
+        logger.info(f"[TRAIN] Processed page. Total trained so far: {trained_count}")
+    
+    logger.info(f"[TRAIN] Complete! Trained: {trained_count}, Skipped (no category): {skipped_count}")
+    
+    return {
+        "status": "success",
+        "trained": trained_count,
+        "skipped": skipped_count,
+        "total": total_fetched,
+        "fetched": total_fetched
+    }
+
+@app.get("/train-stream")
+async def train_stream():
+    """
+    SSE endpoint for training with real-time progress updates.
+    """
+    async def generate():
+        if not service or not firefly:
+            yield f"data: {json.dumps({'stage': 'error', 'message': 'Service not initialized'})}\n\n"
+            return
         
-        # Stage 4: Complete
+        trained_count = 0
+        skipped_count = 0
+        total_fetched = 0
+        total_estimate = 0
+        
+        # Notify start
+        yield f"data: {json.dumps({'stage': 'start'})}\n\n"
+        
+        async for page_txs, meta in firefly.yield_transactions():
+            # Update total estimate from metadata
+            if total_estimate == 0:
+                total_estimate = meta.get("total", 0)
+            
+            total_fetched += len(page_txs)
+            
+            # Process this page
+            for t_data in page_txs:
+                attrs = t_data.get("attributes", {}).get("transactions", [{}])[0]
+                desc = attrs.get("description", "")
+                amount = float(attrs.get("amount", 0.0))
+                curr = attrs.get("currency_code", "EUR")
+                date_str = attrs.get("date", "")
+                category_name = attrs.get("category_name")
+                
+                if not category_name:
+                    skipped_count += 1
+                    continue
+                
+                try:
+                    dt = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
+                except ValueError:
+                    dt = datetime.now()
+                
+                tx_obj = Transaction(
+                    description=desc,
+                    amount=amount,
+                    date=dt,
+                    currency=curr
+                )
+                
+                service.learn(tx_obj, Category(name=category_name))
+                trained_count += 1
+            
+            # Yield progress after each page
+            percent = round(total_fetched / total_estimate * 100, 1) if total_estimate > 0 else 0
+            yield f"data: {json.dumps({'stage': 'processing', 'trained': trained_count, 'skipped': skipped_count, 'fetched': total_fetched, 'total': total_estimate, 'percent': percent})}\n\n"
+        
+        # Stage Complete
         yield f"data: {json.dumps({'stage': 'complete', 'trained': trained_count, 'skipped': skipped_count, 'total_fetched': total_fetched})}\n\n"
     
     return StreamingResponse(generate(), media_type="text/event-stream")

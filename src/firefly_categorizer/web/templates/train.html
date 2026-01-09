@@ -61,58 +61,33 @@
             <!-- All Stages Container - shown when training starts -->
             <div id="stages-container" class="hidden space-y-6">
 
-                <!-- Stage 1: Fetching -->
-                <div id="stage-fetching" class="stage-pending">
+                <!-- Processing Stage -->
+                <div id="stage-processing" class="stage-active">
                     <div class="flex items-center justify-between mb-2">
                         <div class="flex items-center gap-2">
-                            <span id="fetch-icon" class="text-gray-400">⏳</span>
-                            <span class="font-medium text-gray-700">Step 1: Fetching Transactions</span>
+                            <span id="process-icon" class="text-indigo-600 animate-pulse">⚙️</span>
+                            <span class="font-medium text-gray-700">Processing Transactions</span>
                         </div>
-                        <span id="fetch-stats" class="text-sm text-gray-500">Waiting...</span>
+                        <span id="process-stats" class="text-sm text-gray-500">Starting...</span>
                     </div>
                     <div class="w-full bg-gray-200 rounded-full h-3">
-                        <div id="fetch-progress" class="progress-bar bg-blue-500 h-3 rounded-full" style="width: 0%">
+                        <div id="process-progress" class="progress-bar bg-indigo-500 h-3 rounded-full" style="width: 0%">
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-4 mt-2">
+                         <div class="bg-indigo-50 px-3 py-1 rounded text-sm flex justify-between">
+                            <span class="text-gray-600">Trained</span>
+                            <span class="text-indigo-700 font-bold" id="process-trained">0</span>
+                        </div>
+                        <div class="bg-gray-100 px-3 py-1 rounded text-sm flex justify-between">
+                            <span class="text-gray-600">Skipped</span>
+                            <span class="text-gray-500 font-bold" id="process-skipped">0</span>
                         </div>
                     </div>
                 </div>
 
-                <!-- Stage 2: Filtering -->
-                <div id="stage-filtering" class="stage-pending">
-                    <div class="flex items-center justify-between mb-2">
-                        <div class="flex items-center gap-2">
-                            <span id="filter-icon" class="text-gray-400">⏳</span>
-                            <span class="font-medium text-gray-700">Step 2: Filtering Transactions</span>
-                        </div>
-                        <span id="filter-stats" class="text-sm text-gray-500">Waiting...</span>
-                    </div>
-                    <div id="filter-details" class="hidden flex gap-4 mt-2">
-                        <div class="bg-green-50 px-3 py-1 rounded text-sm">
-                            <span class="text-green-700 font-semibold" id="filter-categorized">0</span>
-                            <span class="text-gray-600 ml-1">with categories</span>
-                        </div>
-                        <div class="bg-gray-100 px-3 py-1 rounded text-sm">
-                            <span class="text-gray-600 font-semibold" id="filter-skipped">0</span>
-                            <span class="text-gray-500 ml-1">skipped</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Stage 3: Training -->
-                <div id="stage-training" class="stage-pending">
-                    <div class="flex items-center justify-between mb-2">
-                        <div class="flex items-center gap-2">
-                            <span id="train-icon" class="text-gray-400">⏳</span>
-                            <span class="font-medium text-gray-700">Step 3: Training Models</span>
-                        </div>
-                        <span id="train-stats" class="text-sm text-gray-500">Waiting...</span>
-                    </div>
-                    <div class="w-full bg-gray-200 rounded-full h-3">
-                        <div id="train-progress" class="progress-bar bg-indigo-500 h-3 rounded-full" style="width: 0%">
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Stage 4: Complete -->
+                <!-- Complete Stage -->
                 <div id="stage-complete" class="hidden">
                     <div class="bg-green-50 border border-green-200 rounded-lg p-4 mt-4">
                         <div class="flex items-center gap-2 mb-3">
@@ -130,7 +105,7 @@
                             </div>
                             <div class="text-center">
                                 <div id="result-total" class="text-2xl font-bold text-blue-600">0</div>
-                                <div class="text-sm text-gray-600">Total Fetched</div>
+                                <div class="text-sm text-gray-600">Total Processed</div>
                             </div>
                         </div>
                     </div>
@@ -232,26 +207,13 @@
             document.getElementById('stages-container').classList.remove('hidden');
             document.getElementById('stage-complete').classList.add('hidden');
             document.getElementById('stage-error').classList.add('hidden');
-            document.getElementById('filter-details').classList.add('hidden');
-
-            // Reset all stages to pending
-            ['stage-fetching', 'stage-filtering', 'stage-training'].forEach(id => {
-                const stage = document.getElementById(id);
-                stage.classList.add('stage-pending');
-                stage.classList.remove('stage-active', 'stage-complete');
-            });
-
-            // Reset icons
-            document.getElementById('fetch-icon').textContent = '⏳';
-            document.getElementById('filter-icon').textContent = '⏳';
-            document.getElementById('train-icon').textContent = '⏳';
-
-            // Reset progress
-            document.getElementById('fetch-progress').style.width = '0%';
-            document.getElementById('train-progress').style.width = '0%';
-            document.getElementById('fetch-stats').textContent = 'Waiting...';
-            document.getElementById('filter-stats').textContent = 'Waiting...';
-            document.getElementById('train-stats').textContent = 'Waiting...';
+            document.getElementById('stage-processing').classList.remove('hidden');
+            
+            // Reset stats
+            document.getElementById('process-progress').style.width = '0%';
+            document.getElementById('process-stats').textContent = 'Starting...';
+            document.getElementById('process-trained').textContent = '0';
+            document.getElementById('process-skipped').textContent = '0';
 
             // Connect to SSE endpoint
             const eventSource = new EventSource('/train-stream');
@@ -259,41 +221,19 @@
             eventSource.onmessage = function (event) {
                 const data = JSON.parse(event.data);
 
-                if (data.stage === 'fetching') {
-                    setStageActive('stage-fetching');
-                    document.getElementById('fetch-icon').textContent = '📥';
-                    document.getElementById('fetch-stats').textContent = `${data.fetched} / ${data.total} (${data.percent}%)`;
-                    document.getElementById('fetch-progress').style.width = `${data.percent}%`;
+                if (data.stage === 'start') {
+                    document.getElementById('process-stats').textContent = 'Connecting...';
                 }
-                else if (data.stage === 'filtering') {
-                    // Complete fetching
-                    setStageComplete('stage-fetching', '✅');
-                    document.getElementById('fetch-stats').textContent = 'Done';
-                    document.getElementById('fetch-progress').style.width = '100%';
-
-                    // Activate filtering
-                    setStageActive('stage-filtering');
-                    document.getElementById('filter-icon').textContent = '🔍';
-                    document.getElementById('filter-stats').textContent = `${data.total_fetched} transactions processed`;
-                    document.getElementById('filter-details').classList.remove('hidden');
-                    document.getElementById('filter-categorized').textContent = data.categorized;
-                    document.getElementById('filter-skipped').textContent = data.skipped;
-                }
-                else if (data.stage === 'training') {
-                    // Complete filtering if not done
-                    setStageComplete('stage-filtering', '✅');
-
-                    // Activate training
-                    setStageActive('stage-training');
-                    document.getElementById('train-icon').textContent = '🧠';
-                    document.getElementById('train-stats').textContent = `${data.trained} / ${data.total} (${data.percent}%)`;
-                    document.getElementById('train-progress').style.width = `${data.percent}%`;
+                else if (data.stage === 'processing') {
+                    document.getElementById('process-stats').textContent = `${data.fetched} / ${data.total} processed (${data.percent}%)`;
+                    document.getElementById('process-progress').style.width = `${data.percent}%`;
+                    document.getElementById('process-trained').textContent = data.trained;
+                    document.getElementById('process-skipped').textContent = data.skipped;
                 }
                 else if (data.stage === 'complete') {
-                    // Complete training
-                    setStageComplete('stage-training', '✅');
-                    document.getElementById('train-stats').textContent = 'Done';
-                    document.getElementById('train-progress').style.width = '100%';
+                    document.getElementById('process-stats').textContent = 'Done';
+                    document.getElementById('process-progress').style.width = '100%';
+                    document.getElementById('stage-processing').classList.add('hidden');
 
                     // Show complete section
                     document.getElementById('stage-complete').classList.remove('hidden');
@@ -316,7 +256,7 @@
             eventSource.onerror = function (error) {
                 console.error('SSE Error:', error);
                 document.getElementById('stage-error').classList.remove('hidden');
-                document.getElementById('error-message').textContent = 'Connection lost';
+                document.getElementById('error-message').textContent = 'Connection lost. Check server logs.';
                 eventSource.close();
                 resetButton();
             };
