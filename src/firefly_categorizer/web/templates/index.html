@@ -42,15 +42,20 @@
                     <input type="date" name="end_date" class="border p-2 rounded" value="{{ end_date }}">
                 </div>
                 <button type="submit"
-                    class="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700">Filter</button>
+                    class="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700">Fetch</button>
+                <button type="button" onclick="runCategorization()"
+                    class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 ml-2">Run Categorization</button>
             </form>
         </div>
 
         <!-- Transactions List -->
         <div class="bg-white p-4 rounded shadow">
             <h2 class="text-xl font-semibold mb-4 flex justify-between items-center">
-                Uncategorized Transactions
-                <div id="loading-spinner" class="spinner" style="display: none;"></div>
+                Transactions
+                <div id="loading-state" class="hidden flex items-center gap-2">
+                    <span id="loading-text" class="text-sm text-gray-500 font-normal">Loading...</span>
+                    <div class="spinner"></div>
+                </div>
             </h2>
             <div class="overflow-x-auto">
                 <table class="min-w-full table-auto">
@@ -90,29 +95,44 @@
             fetchTransactions();
         });
 
-        async function fetchTransactions() {
-            const spinner = document.getElementById('loading-spinner');
+        function runCategorization() {
+            fetchTransactions(true);
+        }
+
+        async function fetchTransactions(predict = false) {
+            const loadingState = document.getElementById('loading-state');
+            const loadingText = document.getElementById('loading-text');
             const tbody = document.getElementById('transactions-body');
             const noData = document.getElementById('no-data-message');
 
-            spinner.style.display = 'block';
-            tbody.innerHTML = '';
+            // Set text and show
+            loadingText.textContent = predict ? "Categorizing..." : "Fetching...";
+            loadingState.classList.remove('hidden');
+            
+            if (!predict) {
+                tbody.innerHTML = '';
+            }
             noData.classList.add('hidden');
 
             const params = new URLSearchParams(window.location.search);
+            if (predict) {
+                params.append('predict', 'true');
+            }
 
             try {
                 const response = await fetch(`/api/transactions?${params.toString()}`);
                 const transactions = await response.json();
 
-                spinner.style.display = 'none';
+                loadingState.classList.add('hidden');
 
                 if (!transactions || transactions.length === 0) {
+                    tbody.innerHTML = '';
                     noData.textContent = "No transactions found.";
                     noData.classList.remove('hidden');
                     return;
                 }
 
+                tbody.innerHTML = '';
                 transactions.forEach(t => {
                     const row = document.createElement('tr');
 

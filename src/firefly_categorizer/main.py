@@ -243,7 +243,7 @@ async def learn_transaction(req: LearnRequest):
     }
 
 @app.get("/api/transactions")
-async def get_transactions(start_date: str = None, end_date: str = None):
+async def get_transactions(start_date: str = None, end_date: str = None, predict: bool = False):
     transactions_display = []
     category_list = []
     
@@ -293,7 +293,7 @@ async def get_transactions(start_date: str = None, end_date: str = None):
             # Only predict if not already categorized
             prediction = None
             auto_approved = False
-            if not existing_cat:
+            if predict and not existing_cat:
                 prediction = service.categorize(tx_obj, valid_categories=category_list if category_list else None)
                 
                 # Auto-approve if confidence exceeds threshold
