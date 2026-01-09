@@ -243,9 +243,16 @@ async def learn_transaction(req: LearnRequest):
     }
 
 @app.get("/api/transactions")
-async def get_transactions(start_date: str = None, end_date: str = None, predict: bool = False):
+async def get_transactions(
+    start_date: str = None, 
+    end_date: str = None, 
+    predict: bool = False,
+    page: int = 1,
+    limit: int = 50
+):
     transactions_display = []
     category_list = []
+    pagination = {}
     
     if firefly:
         # Fetch categories to validate predictions
@@ -265,7 +272,15 @@ async def get_transactions(start_date: str = None, end_date: str = None, predict
         else:
             end_date_obj = datetime.strptime(end_date, "%Y-%m-%d")
 
-        raw_txs = await firefly.get_transactions(start_date=start_date_obj, end_date=end_date_obj)
+        result = await firefly.get_transactions(
+            start_date=start_date_obj, 
+            end_date=end_date_obj,
+            page=page,
+            limit=limit
+        )
+        
+        raw_txs = result.get("data", [])
+        pagination = result.get("meta", {})
         
         # Get auto-approve threshold from env (0 = disabled)
         auto_approve_threshold = float(os.getenv("AUTO_APPROVE_THRESHOLD", "0"))
@@ -320,7 +335,10 @@ async def get_transactions(start_date: str = None, end_date: str = None, predict
                 "raw_obj": tx_obj.model_dump_json() # For JS to pick up
             })
 
-    return transactions_display
+    return {
+        "transactions": transactions_display,
+        "pagination": pagination
+    }
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request, start_date: str = None, end_date: str = None):

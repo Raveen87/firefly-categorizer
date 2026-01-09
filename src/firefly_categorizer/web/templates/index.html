@@ -58,6 +58,20 @@
                         <label for="show-categorized" class="toggle-label block overflow-hidden h-6 rounded-full bg-gray-300 cursor-pointer"></label>
                     </div>
                 </div>
+                
+                <div class="flex flex-col pb-1">
+                    <label class="text-sm font-medium text-gray-700 mb-1">Per Page</label>
+                    <select id="limit-select" class="border p-1 rounded text-sm bg-white h-[34px]" onchange="changeLimit(this.value)">
+                        <option value="10">10</option>
+                        <option value="20">20</option>
+                        <option value="50" selected>50</option>
+                        <option value="100">100</option>
+                        <option value="200">200</option>
+                        <option value="500">500</option>
+                        <option value="1000">1000</option>
+                    </select>
+                </div>
+
                 <button type="submit"
                     class="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700">Fetch</button>
                 <button type="button" onclick="runCategorization()"
@@ -74,6 +88,19 @@
                     <div class="spinner"></div>
                 </div>
             </h2>
+
+            <!-- Top Pagination Controls -->
+            <div class="pagination-controls flex justify-center items-center mb-4 border-b pb-4 hidden gap-4">
+                 <button class="prev-page-btn px-3 py-1 border rounded bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed" onclick="changePage(-1)">Previous</button>
+                 
+                 <div class="text-sm text-gray-600">
+                    Page <span class="current-page-display font-bold">1</span> of <span class="total-pages-display font-bold">1</span>
+                    (<span class="total-items-display">0</span> transactions)
+                 </div>
+                 
+                 <button class="next-page-btn px-3 py-1 border rounded bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed" onclick="changePage(1)">Next</button>
+            </div>
+
             <div class="overflow-x-auto">
                 <table class="min-w-full table-auto">
                     <thead>
@@ -94,6 +121,18 @@
                     No transactions found (or still loading...)
                 </div>
             </div>
+
+            <!-- Bottom Pagination Controls -->
+            <div class="pagination-controls flex justify-center items-center mt-4 border-t pt-4 hidden gap-4">
+                 <button class="prev-page-btn px-3 py-1 border rounded bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed" onclick="changePage(-1)">Previous</button>
+                 
+                 <div class="text-sm text-gray-600">
+                    Page <span class="current-page-display font-bold">1</span> of <span class="total-pages-display font-bold">1</span>
+                    (<span class="total-items-display">0</span> transactions)
+                 </div>
+                 
+                 <button class="next-page-btn px-3 py-1 border rounded bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed" onclick="changePage(1)">Next</button>
+            </div>
         </div>
     </div>
 {% endblock %}
@@ -106,6 +145,10 @@
         // ideally backend passes json string, but let's try to assume safe output
         const CATEGORIES = {{ categories | tojson }}; 
         let currentTransactions = [];
+        let currentPage = 1;
+        let itemsPerPage = 50;
+        let totalPages = 1;
+        let totalTransactions = 0;
     </script>
 
     <script>
@@ -122,6 +165,7 @@
             const loadingText = document.getElementById('loading-text');
             const noData = document.getElementById('no-data-message');
             const tbody = document.getElementById('transactions-body');
+            const paginationControls = document.querySelectorAll('.pagination-controls');
 
             // Set text and show
             loadingText.textContent = predict ? "Categorizing..." : "Fetching...";
@@ -131,15 +175,30 @@
                 tbody.innerHTML = '';
             }
             noData.classList.add('hidden');
+            paginationControls.forEach(el => el.classList.add('hidden'));
 
             const params = new URLSearchParams(window.location.search);
             if (predict) {
                 params.append('predict', 'true');
             }
+            params.append('page', currentPage);
+            params.append('limit', itemsPerPage);
 
             try {
                 const response = await fetch(`/api/transactions?${params.toString()}`);
-                currentTransactions = await response.json();
+                const data = await response.json();
+                
+                // Handle new structure
+                if (data.transactions) {
+                    currentTransactions = data.transactions;
+                    if (data.pagination) {
+                        totalPages = data.pagination.total_pages || 1;
+                        totalTransactions = data.pagination.total || 0;
+                    }
+                } else {
+                    // Fallback for old structure
+                    currentTransactions = Array.isArray(data) ? data : [];
+                }
 
                 loadingState.classList.add('hidden');
                 renderTransactions();
@@ -152,18 +211,42 @@
             }
         }
 
+        function changePage(delta) {
+            const newPage = currentPage + delta;
+            if (newPage >= 1 && newPage <= totalPages) {
+                currentPage = newPage;
+                fetchTransactions();
+            }
+        }
+        
+        function changeLimit(limit) {
+            itemsPerPage = parseInt(limit);
+            currentPage = 1; // Reset to page 1
+            fetchTransactions();
+        }
+
         function renderTransactions() {
             const tbody = document.getElementById('transactions-body');
             const noData = document.getElementById('no-data-message');
+            const paginationControls = document.querySelectorAll('.pagination-controls');
             
             tbody.innerHTML = '';
 
             if (!currentTransactions || currentTransactions.length === 0) {
                 noData.textContent = "No transactions found.";
                 noData.classList.remove('hidden');
+                paginationControls.forEach(el => el.classList.add('hidden'));
                 return;
             }
             noData.classList.add('hidden');
+            paginationControls.forEach(el => el.classList.remove('hidden'));
+
+            // Update Pagination UI (All blocks)
+            document.querySelectorAll('.current-page-display').forEach(el => el.textContent = currentPage);
+            document.querySelectorAll('.total-pages-display').forEach(el => el.textContent = totalPages);
+            document.querySelectorAll('.total-items-display').forEach(el => el.textContent = totalTransactions);
+            document.querySelectorAll('.prev-page-btn').forEach(btn => btn.disabled = currentPage <= 1);
+            document.querySelectorAll('.next-page-btn').forEach(btn => btn.disabled = currentPage >= totalPages);
 
             // Get toggle state
             const showCategorized = document.getElementById('show-categorized').checked;
@@ -240,7 +323,7 @@
                         <button id="btn-${t.id}" onclick="saveTransaction('${t.id}', '${predictedCat || ''}')"
                             class="${buttonClass}" ${buttonDisabled}>Save</button>
                         <!-- Store raw object strictly as a string in a data attribute or hidden div -->
-                            <input type="hidden" id="raw-${t.id}" value='${t.raw_obj}'>
+                             <input type="hidden" id="raw-${t.id}" value='${t.raw_obj}'>
                     </td>
                 `;
                 tbody.appendChild(row);

@@ -19,44 +19,51 @@ def mock_service():
 def test_get_transactions_no_predict(mock_firefly, mock_service):
     # Mock Firefly returning uncategorized transactions
     mock_firefly.get_categories.return_value = []
-    mock_firefly.get_transactions.return_value = [
-        {
-            "id": "1",
-            "attributes": {
-                "transactions": [{
-                    "description": "uncategorized tx",
-                    "amount": "10.00",
-                    "date": "2023-01-01T10:00:00Z",
-                    "category_name": None
-                }]
+    mock_firefly.get_transactions.return_value = {
+        "data": [
+            {
+                "id": "1",
+                "attributes": {
+                    "transactions": [{
+                        "description": "uncategorized tx",
+                        "amount": "10.00",
+                        "date": "2023-01-01T10:00:00Z",
+                        "category_name": None
+                    }]
+                }
             }
-        }
-    ]
+        ],
+        "meta": {"total": 1}
+    }
 
     response = client.get("/api/transactions")
     assert response.status_code == 200
     data = response.json()
-    assert len(data) == 1
+    assert "transactions" in data
+    assert len(data["transactions"]) == 1
     # Should not have called categorize
     mock_service.categorize.assert_not_called()
-    assert data[0]["prediction"] is None
+    assert data["transactions"][0]["prediction"] is None
 
 def test_get_transactions_with_predict(mock_firefly, mock_service):
     # Mock Firefly returning uncategorized transactions
     mock_firefly.get_categories.return_value = [{"attributes": {"name": "Food"}}]
-    mock_firefly.get_transactions.return_value = [
-        {
-            "id": "1",
-            "attributes": {
-                "transactions": [{
-                    "description": "uncategorized tx",
-                    "amount": "10.00",
-                    "date": "2023-01-01T10:00:00Z",
-                    "category_name": None
-                }]
+    mock_firefly.get_transactions.return_value = {
+        "data": [
+            {
+                "id": "1",
+                "attributes": {
+                    "transactions": [{
+                        "description": "uncategorized tx",
+                        "amount": "10.00",
+                        "date": "2023-01-01T10:00:00Z",
+                        "category_name": None
+                    }]
+                }
             }
-        }
-    ]
+        ],
+        "meta": {"total": 1}
+    }
     
     # Mock prediction
     mock_service.categorize.return_value = CategorizationResult(
@@ -68,9 +75,9 @@ def test_get_transactions_with_predict(mock_firefly, mock_service):
     response = client.get("/api/transactions?predict=true")
     assert response.status_code == 200
     data = response.json()
-    assert len(data) == 1
+    assert len(data["transactions"]) == 1
     
     # Should have called categorize
     mock_service.categorize.assert_called_once()
-    assert data[0]["prediction"] is not None
-    assert data[0]["prediction"]["category"]["name"] == "Food"
+    assert data["transactions"][0]["prediction"] is not None
+    assert data["transactions"][0]["prediction"]["category"]["name"] == "Food"

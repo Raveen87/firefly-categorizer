@@ -16,16 +16,17 @@ class FireflyClient:
             "Accept": "application/json",
         }
 
-    async def get_transactions(self, start_date: datetime = None, end_date: datetime = None, limit: int = 50) -> List[dict]:
+    async def get_transactions(self, start_date: datetime = None, end_date: datetime = None, limit: int = 50, page: int = 1) -> dict:
         if not self.base_url or not self.token:
             logger.error("Firefly credentials missing.")
-            return []
+            return {"data": [], "meta": {}}
             
         async with httpx.AsyncClient() as client:
             try:
                 # Firefly API filtering by date is via query params
                 params = {
                     "limit": limit,
+                    "page": page,
                     "type": "withdrawal", # Usually we categorize withdrawals
                 }
                 if start_date:
@@ -36,10 +37,13 @@ class FireflyClient:
                 response = await client.get(f"{self.base_url}/api/v1/transactions", headers=self.headers, params=params)
                 response.raise_for_status()
                 data = response.json()
-                return data.get("data", [])
+                return {
+                    "data": data.get("data", []),
+                    "meta": data.get("meta", {}).get("pagination", {})
+                }
             except Exception as e:
                 logger.error(f"Error fetching transactions: {e}")
-                return []
+                return {"data": [], "meta": {}}
 
     async def get_all_transactions(self, limit_per_page: int = 500) -> dict:
         """Fetch all transactions with pagination. Returns dict with transactions and metadata."""
