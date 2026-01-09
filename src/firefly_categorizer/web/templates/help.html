@@ -1,0 +1,99 @@
+{% extends "layout.html" %}
+
+{% block title %}Help - Firefly Categorizer{% endblock %}
+
+{% block content %}
+    <div class="container mx-auto p-4">
+        <div class="max-w-4xl mx-auto space-y-12">
+            
+            <!-- Introduction -->
+            <section class="text-center">
+                <h1 class="text-3xl font-bold text-gray-800 mb-4">How it Works</h1>
+                <p class="text-lg text-gray-600">
+                    Firefly Categorizer is an intelligent companion for your Firefly III finance manager. 
+                    It automates the tedious task of categorizing transactions using a blend of memory, machine learning, and AI.
+                </p>
+            </section>
+
+            <!-- Classification Engine -->
+            <section>
+                <h3 class="text-2xl font-semibold text-gray-700 mb-6">🧠 The "Brain" (Classification Engine)</h3>
+                <p class="text-gray-600 mb-4">When a transaction arrives, it goes through a three-stage decision process:</p>
+                
+                <div class="space-y-4">
+                    <!-- Memory -->
+                    <div class="bg-white p-4 rounded shadow border-l-4 border-blue-500 flex justify-between items-start">
+                        <div>
+                            <div class="font-bold text-gray-800">Memory Matcher</div>
+                            <p class="text-gray-600 text-sm mt-1">Checks for an exact match or a very close "fuzzy" match (e.g., spelling differences) against your history. If you categorized "Netflix" before, it will recognize "Netflix.com".</p>
+                        </div>
+                        <span class="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-semibold ml-4 whitespace-nowrap">Fastest</span>
+                    </div>
+
+                    <!-- TF-IDF -->
+                    <div class="bg-white p-4 rounded shadow border-l-4 border-green-500 flex justify-between items-start">
+                        <div>
+                            <div class="font-bold text-gray-800">TF-IDF (Machine Learning)</div>
+                            <p class="text-gray-600 text-sm mt-1">If no exact match is found, it uses statistical analysis to compare the transaction description against all your past data to find similarities.</p>
+                        </div>
+                        <span class="bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-semibold ml-4 whitespace-nowrap">Smart</span>
+                    </div>
+
+                    <!-- LLM -->
+                    <div class="bg-white p-4 rounded shadow border-l-4 border-yellow-500 flex justify-between items-start">
+                        <div>
+                            <div class="font-bold text-gray-800">LLM (OpenAI)</div>
+                            <p class="text-gray-600 text-sm mt-1">As a last resort (and if configured), it asks an advanced AI model to determine the category based on the description.</p>
+                        </div>
+                        <span class="bg-yellow-100 text-yellow-800 px-2 py-1 rounded text-xs font-semibold ml-4 whitespace-nowrap">Fallback</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Using the Dashboard -->
+            <section>
+                <h3 class="text-2xl font-semibold text-gray-700 mb-6">💻 Using the Dashboard</h3>
+                
+                <div class="bg-white p-6 rounded shadow mb-6">
+                    <h5 class="text-lg font-bold text-gray-800 mb-2">1. Categorize View (Home)</h5>
+                    <div class="text-gray-600 space-y-2">
+                        <p>The main page lists your recent transactions from Firefly III.</p>
+                        <ul class="list-disc list-inside ml-4 space-y-1">
+                            <li><strong>Uncategorized transactions</strong> will show a suggested category. You can accept it (Checkmark) or choose a different one from the dropdown.</li>
+                            <li><strong>Categorized transactions</strong> are shown for reference.</li>
+                        </ul>
+                        <p class="italic text-sm mt-2">When you confirm or change a category, the system "learns" immediately and updates Firefly III.</p>
+                    </div>
+                </div>
+
+                <div class="bg-white p-6 rounded shadow">
+                    <h5 class="text-lg font-bold text-gray-800 mb-2">2. Training Center</h5>
+                    <p class="text-gray-600">
+                        The "Training" page allows you to bulk-train the model using your entire history from Firefly III. 
+                        This is useful when you first set up the application or if you've made many changes directly in Firefly III.
+                    </p>
+                </div>
+            </section>
+
+            <!-- Configuration -->
+            <section>
+                <h3 class="text-2xl font-semibold text-gray-700 mb-6">⚙️ Configuration & Features</h3>
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-6 bg-white p-6 rounded shadow">
+                    
+                    <div class="font-semibold text-gray-700">Auto-Approve</div>
+                    <div class="md:col-span-3 text-gray-600">
+                        You can set an <code class="bg-gray-100 px-1 py-0.5 rounded text-sm text-pink-600">AUTO_APPROVE_THRESHOLD</code> (e.g., 0.9) in your <code class="bg-gray-100 px-1 py-0.5 rounded text-sm text-pink-600">.env</code> file. 
+                        If the system is confident enough in its prediction, it will automatically update Firefly III without waiting for your confirmation.
+                    </div>
+
+                    <div class="font-semibold text-gray-700 border-t md:border-t-0 pt-4 md:pt-0">Webhooks</div>
+                    <div class="md:col-span-3 text-gray-600 border-t md:border-t-0 pt-4 md:pt-0">
+                        The application can listen for real-time events from Firefly III. 
+                        If you configure a webhook in Firefly to point here, new transactions can be categorized instantly as they are created.
+                    </div>
+                </div>
+            </section>
+
+        </div>
+    </div>
+{% endblock %}

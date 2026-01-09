@@ -356,6 +356,12 @@ async def index(request: Request, start_date: str = None, end_date: str = None):
         "end_date": end_date
     })
 
+@app.get("/help", response_class=HTMLResponse)
+async def help_page(request: Request):
+    return templates.TemplateResponse("help.html", {
+        "request": request
+    })
+
 @app.get("/train-page", response_class=HTMLResponse)
 async def train_page(request: Request):
     return templates.TemplateResponse("train.html", {

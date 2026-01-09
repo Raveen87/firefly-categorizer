@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Firefly Categorizer{% endblock %}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    {% block head %}{% endblock %}
+</head>
+<body class="bg-gray-100 text-gray-800 font-sans">
+
+    <!-- Navigation -->
+    <nav class="bg-indigo-600 text-white shadow-lg">
+        <div class="container mx-auto px-4 py-3 flex items-center justify-between">
+            <a href="/" class="text-xl font-bold flex items-center gap-2">
+                <span>Firefly Categorizer</span>
+            </a>
+            <div class="flex gap-6">
+                <a href="/" class="hover:text-indigo-200 font-medium transition-colors {% if request.url.path == '/' %}border-b-2 border-white pb-1{% endif %}">
+                    Categorize
+                </a>
+                <a href="/train-page" class="hover:text-indigo-200 font-medium transition-colors {% if request.url.path == '/train-page' %}border-b-2 border-white pb-1{% endif %}">
+                    Training
+                </a>
+                <a href="/help" class="hover:text-indigo-200 font-medium transition-colors {% if request.url.path == '/help' %}border-b-2 border-white pb-1{% endif %}">
+                    Help
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="min-h-screen">
+        {% block content %}{% endblock %}
+    </div>
+
+    <footer class="bg-white border-t mt-12 py-6 text-center text-gray-500 text-sm">
+        &copy; 2026 Firefly Categorizer
+    </footer>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>

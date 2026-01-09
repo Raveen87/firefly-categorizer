@@ -1,11 +1,8 @@
-<!DOCTYPE html>
-<html lang="en">
+{% extends "layout.html" %}
 
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Train Models - Firefly Categorizer</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+{% block title %}Train Models - Firefly Categorizer{% endblock %}
+
+{% block head %}
     <style>
         .progress-bar {
             transition: width 0.3s ease-in-out;
@@ -23,22 +20,9 @@
             opacity: 1;
         }
     </style>
-</head>
+{% endblock %}
 
-<body class="bg-gray-100 text-gray-800">
-
-    <!-- Navigation -->
-    <nav class="bg-indigo-600 text-white shadow-lg">
-        <div class="container mx-auto px-4 py-3 flex items-center justify-between">
-            <a href="/" class="text-xl font-bold">Firefly Categorizer</a>
-            <div class="flex gap-6">
-                <a href="/" class="hover:text-indigo-200">Categorize</a>
-                <a href="/train-page" class="hover:text-indigo-200 font-medium border-b-2 border-white pb-1">Train
-                    Models</a>
-            </div>
-        </div>
-    </nav>
-
+{% block content %}
     <div class="container mx-auto p-4">
         <h1 class="text-2xl font-bold mb-6 text-gray-700">Train Models</h1>
 
@@ -187,7 +171,9 @@
             </div>
         </div>
     </div>
+{% endblock %}
 
+{% block scripts %}
     <script>
         async function clearModels() {
             if (!confirm("⚠️ DANGER: Are you sure you want to clear all models?\n\nThis will permanently delete all learned transaction patterns. Future categorizations will be inaccurate until you retrain the models.\n\nOnly proceed if you are testing or need to reset corrupted data.")) {
@@ -348,6 +334,4 @@
             `;
         }
     </script>
-</body>
-
-</html>
+{% endblock %}
