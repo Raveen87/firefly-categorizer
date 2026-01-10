@@ -7,7 +7,7 @@ from firefly_categorizer.main import app
 
 client = TestClient(app)
 
-def test_index_params():
+def test_index_params() -> None:
     response = client.get("/?start_date=2023-02-01&end_date=2023-02-28")
     assert response.status_code == 200
     content = response.text

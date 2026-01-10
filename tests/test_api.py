@@ -1,3 +1,4 @@
+from collections.abc import Generator
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -9,16 +10,16 @@ from firefly_categorizer.models import CategorizationResult, Category
 client = TestClient(app)
 
 @pytest.fixture
-def mock_firefly():
+def mock_firefly() -> Generator[AsyncMock, None, None]:
     with patch("firefly_categorizer.main.firefly", new_callable=AsyncMock) as m:
         yield m
 
 @pytest.fixture
-def mock_service():
+def mock_service() -> Generator[MagicMock, None, None]:
     with patch("firefly_categorizer.main.service", new_callable=MagicMock) as m:
         yield m
 
-def test_get_transactions_no_predict(mock_firefly, mock_service):
+def test_get_transactions_no_predict(mock_firefly: AsyncMock, mock_service: MagicMock) -> None:
     # Mock Firefly returning uncategorized transactions
     mock_firefly.get_categories.return_value = []
     mock_firefly.get_transactions.return_value = {
@@ -47,7 +48,7 @@ def test_get_transactions_no_predict(mock_firefly, mock_service):
     mock_service.categorize.assert_not_called()
     assert data["transactions"][0]["prediction"] is None
 
-def test_get_transactions_with_predict(mock_firefly, mock_service):
+def test_get_transactions_with_predict(mock_firefly: AsyncMock, mock_service: MagicMock) -> None:
     # Mock Firefly returning uncategorized transactions
     mock_firefly.get_categories.return_value = [{"attributes": {"name": "Food"}}]
     mock_firefly.get_transactions.return_value = {

@@ -43,3 +43,29 @@ The `/app/data` volume is used to persist learned categories/models.
 
 ## Integration
 *   **Webhooks**: Configure Firefly III to send webhooks to `http://<your-ip>:8000/webhook/firefly` (JSON format).
+
+## Development
+
+This project uses **Ruff** for linting and **ty** for type checking.
+
+### Linting
+To check for linting issues:
+```bash
+uv run ruff check .
+```
+To automatically fix issues:
+```bash
+uv run ruff check . --fix
+```
+
+### Type Checking
+To run type checking:
+```bash
+uv run ty check
+```
+
+### Testing
+To run the test suite:
+```bash
+uv run pytest
+```

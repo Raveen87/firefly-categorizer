@@ -1,4 +1,5 @@
 from datetime import datetime
+from pathlib import Path
 
 import pytest
 
@@ -7,11 +8,11 @@ from firefly_categorizer.models import Category, Transaction
 
 
 @pytest.fixture
-def tfidf_classifier(tmp_path):
+def tfidf_classifier(tmp_path: Path) -> TfidfClassifier:
     data_file = tmp_path / "tfidf.pkl"
     return TfidfClassifier(data_path=str(data_file), threshold=0.5)
 
-def test_tfidf_learn_and_classify(tfidf_classifier):
+def test_tfidf_learn_and_classify(tfidf_classifier: TfidfClassifier) -> None:
     # Train heavily to ensure TF-IDF picks it up
     c1 = Category(name="Food")
     c2 = Category(name="Transport")
@@ -37,7 +38,7 @@ def test_tfidf_learn_and_classify(tfidf_classifier):
     assert res.category.name == "Food"
     assert res.source == "tfidf"
 
-def test_tfidf_persistence(tfidf_classifier, tmp_path):
+def test_tfidf_persistence(tfidf_classifier: TfidfClassifier, tmp_path: Path) -> None:
     t = Transaction(description="Netflix", amount=10.0, date=datetime.now())
     c = Category(name="Subscriptions")
     tfidf_classifier.learn(t, c)

@@ -1,3 +1,5 @@
+from collections.abc import AsyncGenerator
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -6,7 +8,7 @@ from firefly_categorizer.integration.firefly import FireflyClient
 
 
 @pytest.mark.anyio
-async def test_firefly_yield_transactions():
+async def test_firefly_yield_transactions() -> None:
     """Test that yield_transactions yields pages correctly."""
     client = FireflyClient(base_url="http://test", token="token")
 
@@ -50,7 +52,7 @@ async def test_firefly_yield_transactions():
         assert pages[1][0][0]["id"] == "2"
 
 @pytest.mark.anyio
-async def test_train_endpoint_chunking():
+async def test_train_endpoint_chunking() -> None:
     """Test that the /train endpoint processes chunks."""
     from firefly_categorizer.main import train_models
 
@@ -64,7 +66,9 @@ async def test_train_endpoint_chunking():
         batch1 = ([{"attributes": {"transactions": [{"description": "t1", "category_name": "C1"}]}}], {"total": 2})
         batch2 = ([{"attributes": {"transactions": [{"description": "t2", "category_name": "C2"}]}}], {"total": 2})
 
-        async def mock_generator(limit_per_page=500):
+        async def mock_generator(
+            limit_per_page: int = 500
+        ) -> AsyncGenerator[tuple[list[dict[str, Any]], dict[str, Any]], None]:
             yield batch1
             yield batch2
 

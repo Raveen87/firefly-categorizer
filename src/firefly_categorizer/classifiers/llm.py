@@ -1,5 +1,4 @@
 import os
-from typing import List, Optional
 
 from openai import OpenAI
 
@@ -11,14 +10,16 @@ from .base import Classifier
 logger = get_logger(__name__)
 
 class LLMClassifier(Classifier):
-    def __init__(self, api_key: Optional[str] = None, model: str = "gpt-3.5-turbo", base_url: Optional[str] = None):
+    def __init__(self, api_key: str | None = None, model: str = "gpt-3.5-turbo", base_url: str | None = None):
         self.client = OpenAI(
             api_key=api_key or os.getenv("OPENAI_API_KEY"),
             base_url=base_url or os.getenv("OPENAI_BASE_URL") or None
         )
         self.model = model
 
-    def classify(self, transaction: Transaction, valid_categories: Optional[List[str]] = None) -> Optional[CategorizationResult]:
+    def classify(
+        self, transaction: Transaction, valid_categories: list[str] | None = None
+    ) -> CategorizationResult | None:
         try:
             prompt_categories = ""
             if valid_categories:
@@ -31,7 +32,7 @@ class LLMClassifier(Classifier):
             Amount: {transaction.amount} {transaction.currency}
             Date: {transaction.date}
             {prompt_categories}
-            
+
             Return ONLY the category name. If unsure or if it doesn't fit any valid category, return 'Uncategorized'.
             """
 
@@ -44,7 +45,10 @@ class LLMClassifier(Classifier):
                 temperature=0.0
             )
 
-            category_name = response.choices[0].message.content.strip()
+            category_name = response.choices[0].message.content
+            if category_name is None:
+                return None
+            category_name = category_name.strip()
 
             if valid_categories:
                 if category_name not in valid_categories:
@@ -60,7 +64,7 @@ class LLMClassifier(Classifier):
             logger.error(f"LLM Error: {e}")
             return None
 
-    def learn(self, transaction: Transaction, category: Category):
+    def learn(self, transaction: Transaction, category: Category) -> None:
         # We don't fine-tune the LLM in this simple version.
         # We could add to few-shot examples in future prompts.
         pass

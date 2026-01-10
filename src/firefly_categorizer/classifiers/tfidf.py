@@ -1,6 +1,5 @@
 import os
 import pickle
-from typing import List, Optional
 
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import SGDClassifier
@@ -19,12 +18,12 @@ class TfidfClassifier(Classifier):
             ('tfidf', TfidfVectorizer(analyzer='char_wb', ngram_range=(3, 5), min_df=1)),
             ('clf', SGDClassifier(loss='log_loss', random_state=42))
         ])
-        self.examples: List[str] = []
-        self.labels: List[str] = []
+        self.examples: list[str] = []
+        self.labels: list[str] = []
         self.is_fitted = False
         self.load()
 
-    def load(self):
+    def load(self) -> None:
         if os.path.exists(self.data_path):
             try:
                 with open(self.data_path, "rb") as f:
@@ -39,14 +38,16 @@ class TfidfClassifier(Classifier):
                 self.labels = []
                 self.is_fitted = False
 
-    def save(self):
+    def save(self) -> None:
         with open(self.data_path, "wb") as f:
             pickle.dump({
                 "examples": self.examples,
                 "labels": self.labels
             }, f)
 
-    def classify(self, transaction: Transaction, valid_categories: Optional[List[str]] = None) -> Optional[CategorizationResult]:
+    def classify(
+        self, transaction: Transaction, valid_categories: list[str] | None = None
+    ) -> CategorizationResult | None:
         if not self.is_fitted:
             return None
 
@@ -69,7 +70,7 @@ class TfidfClassifier(Classifier):
 
         return None
 
-    def learn(self, transaction: Transaction, category: Category):
+    def learn(self, transaction: Transaction, category: Category) -> None:
         self.examples.append(transaction.description)
         self.labels.append(category.name)
 
@@ -80,7 +81,7 @@ class TfidfClassifier(Classifier):
             self.is_fitted = True
             self.save()
 
-    def clear(self):
+    def clear(self) -> None:
         self.examples = []
         self.labels = []
         self.is_fitted = False

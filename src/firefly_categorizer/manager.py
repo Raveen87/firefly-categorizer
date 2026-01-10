@@ -1,5 +1,4 @@
 import os
-from typing import List, Optional
 
 from firefly_categorizer.classifiers.base import Classifier
 from firefly_categorizer.classifiers.llm import LLMClassifier
@@ -16,7 +15,7 @@ class CategorizerService:
                  tfidf_threshold: float = 0.5,
                  data_dir: str = "."):
 
-        self.classifiers: List[Classifier] = []
+        self.classifiers: list[Classifier] = []
 
         # 1. Memory Matcher (Highest priority)
         self.memory = MemoryMatcher(
@@ -45,7 +44,9 @@ class CategorizerService:
             self.llm = None
             logger.warning("OPENAI_API_KEY not found. LLM classifier disabled.")
 
-    def categorize(self, transaction: Transaction, valid_categories: Optional[List[str]] = None) -> Optional[CategorizationResult]:
+    def categorize(
+        self, transaction: Transaction, valid_categories: list[str] | None = None
+    ) -> CategorizationResult | None:
         for classifier in self.classifiers:
             classifier_name = classifier.__class__.__name__
             logger.debug(f"Trying {classifier_name} for: '{transaction.description[:50]}...'")
@@ -53,7 +54,10 @@ class CategorizerService:
             result = classifier.classify(transaction, valid_categories=valid_categories)
 
             if result:
-                logger.debug(f"{classifier_name} returned: '{result.category.name}' (confidence: {result.confidence:.2f})")
+                logger.debug(
+                    f"{classifier_name} returned: '{result.category.name}' "
+                    f"(confidence: {result.confidence:.2f})"
+                )
                 return result
             else:
                 logger.debug(f"{classifier_name} returned: None")
@@ -61,7 +65,7 @@ class CategorizerService:
         logger.debug(f"No classifier matched for: '{transaction.description[:50]}...'")
         return None
 
-    def learn(self, transaction: Transaction, category: Category):
+    def learn(self, transaction: Transaction, category: Category) -> None:
         """
         Teach all trainable classifiers.
         """
@@ -69,7 +73,7 @@ class CategorizerService:
         self.memory.learn(transaction, category)
         self.tfidf.learn(transaction, category)
 
-    def clear_models(self):
+    def clear_models(self) -> None:
         """
         Clear all local training data.
         """

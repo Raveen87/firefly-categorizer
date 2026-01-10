@@ -1,8 +1,9 @@
 import json
 import os
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Any
 
 import uvicorn
 from dotenv import load_dotenv
@@ -25,12 +26,12 @@ setup_logging()
 logger = get_logger(__name__)
 
 # Global service instance
-service: Optional[CategorizerService] = None
-firefly: Optional[FireflyClient] = None
+service: CategorizerService | None = None
+firefly: FireflyClient | None = None
 templates = Jinja2Templates(directory=os.path.join(os.path.dirname(__file__), "web/templates"))
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     global service, firefly
     # Initialize service on startup
     logger.info("Initializing services...")
@@ -62,11 +63,11 @@ class CategorizeRequest(BaseModel):
 class LearnRequest(BaseModel):
     transaction: Transaction
     category: Category
-    transaction_id: Optional[str] = None
-    suggested_category: Optional[str] = None  # What the model suggested
+    transaction_id: str | None = None
+    suggested_category: str | None = None  # What the model suggested
 
-@app.post("/categorize", response_model=Optional[CategorizationResult])
-async def categorize_transaction(req: CategorizeRequest):
+@app.post("/categorize", response_model=CategorizationResult | None)
+async def categorize_transaction(req: CategorizeRequest) -> CategorizationResult | None:
     if not service:
         raise HTTPException(status_code=500, detail="Service not initialized")
 
@@ -80,14 +81,14 @@ async def categorize_transaction(req: CategorizeRequest):
     return service.categorize(req.transaction, valid_categories=valid_cats)
 
 @app.get("/categories")
-async def get_categories():
+async def get_categories() -> list[str]:
     if not firefly:
         return []
     raw = await firefly.get_categories()
     return [c["attributes"]["name"] for c in raw]
 
 @app.post("/train")
-async def train_models():
+async def train_models() -> dict[str, Any]:
     """
     Train models using all existing categorized transactions from Firefly.
     """
@@ -147,11 +148,11 @@ async def train_models():
     }
 
 @app.get("/train-stream")
-async def train_stream():
+async def train_stream() -> StreamingResponse:
     """
     SSE endpoint for training with real-time progress updates.
     """
-    async def generate():
+    async def generate() -> AsyncGenerator[str, None]:
         if not service or not firefly:
             yield f"data: {json.dumps({'stage': 'error', 'message': 'Service not initialized'})}\n\n"
             return
@@ -201,15 +202,27 @@ async def train_stream():
 
             # Yield progress after each page
             percent = round(total_fetched / total_estimate * 100, 1) if total_estimate > 0 else 0
-            yield f"data: {json.dumps({'stage': 'processing', 'trained': trained_count, 'skipped': skipped_count, 'fetched': total_fetched, 'total': total_estimate, 'percent': percent})}\n\n"
+            yield f"data: {json.dumps({
+                'stage': 'processing',
+                'trained': trained_count,
+                'skipped': skipped_count,
+                'fetched': total_fetched,
+                'total': total_estimate,
+                'percent': percent
+            })}\n\n"
 
         # Stage Complete
-        yield f"data: {json.dumps({'stage': 'complete', 'trained': trained_count, 'skipped': skipped_count, 'total_fetched': total_fetched})}\n\n"
+        yield f"data: {json.dumps({
+            'stage': 'complete',
+            'trained': trained_count,
+            'skipped': skipped_count,
+            'total_fetched': total_fetched
+        })}\n\n"
 
     return StreamingResponse(generate(), media_type="text/event-stream")
 
 @app.post("/clear-models")
-async def clear_models():
+async def clear_models() -> dict[str, str]:
     if not service:
         raise HTTPException(status_code=500, detail="Service not initialized")
 
@@ -217,7 +230,7 @@ async def clear_models():
     return {"status": "success", "message": "All models cleared"}
 
 @app.post("/learn")
-async def learn_transaction(req: LearnRequest):
+async def learn_transaction(req: LearnRequest) -> dict[str, Any]:
     if not service:
         raise HTTPException(status_code=500, detail="Service not initialized")
 
@@ -226,7 +239,10 @@ async def learn_transaction(req: LearnRequest):
     source = "model" if is_model_suggested else "manual"
 
     # Log the categorization
-    logger.info(f"[CATEGORIZE] Transaction ID: {req.transaction_id or 'N/A'} -> Category: '{req.category.name}' (Source: {source})")
+    logger.info(
+        f"[CATEGORIZE] Transaction ID: {req.transaction_id or 'N/A'} -> "
+        f"Category: '{req.category.name}' (Source: {source})"
+    )
 
     # 1. Update Local Models
     service.learn(req.transaction, req.category)
@@ -246,12 +262,12 @@ async def learn_transaction(req: LearnRequest):
 
 @app.get("/api/transactions")
 async def get_transactions(
-    start_date: Optional[str] = None,
-    end_date: Optional[str] = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
     predict: bool = False,
     page: int = 1,
     limit: int = 50
-):
+) -> dict[str, Any]:
     transactions_display = []
     category_list = []
     pagination = {}
@@ -310,12 +326,15 @@ async def get_transactions(
             # Only predict if not already categorized
             prediction = None
             auto_approved = False
-            if predict and not existing_cat:
+            if predict and not existing_cat and service:
                 prediction = service.categorize(tx_obj, valid_categories=category_list if category_list else None)
 
                 # Auto-approve if confidence exceeds threshold
                 if prediction and auto_approve_threshold > 0 and prediction.confidence >= auto_approve_threshold:
-                    logger.info(f"[AUTO-APPROVE] Transaction {tx_id}: '{prediction.category.name}' (confidence: {prediction.confidence:.2f} >= {auto_approve_threshold})")
+                    logger.info(
+                        f"[AUTO-APPROVE] Transaction {tx_id}: '{prediction.category.name}' "
+                        f"(confidence: {prediction.confidence:.2f} >= {auto_approve_threshold})"
+                    )
                     # Update Firefly
                     success = await firefly.update_transaction(tx_id, prediction.category.name)
                     if success:
@@ -343,7 +362,7 @@ async def get_transactions(
     }
 
 @app.get("/", response_class=HTMLResponse)
-async def index(request: Request, start_date: Optional[str] = None, end_date: Optional[str] = None):
+async def index(request: Request, start_date: str | None = None, end_date: str | None = None) -> HTMLResponse:
     category_list = []
     if firefly:
         raw_cats = await firefly.get_categories()
@@ -363,20 +382,20 @@ async def index(request: Request, start_date: Optional[str] = None, end_date: Op
     })
 
 @app.get("/help", response_class=HTMLResponse)
-async def help_page(request: Request):
+async def help_page(request: Request) -> HTMLResponse:
     return templates.TemplateResponse("help.html", {
         "request": request
     })
 
 @app.get("/train-page", response_class=HTMLResponse)
-async def train_page(request: Request):
+async def train_page(request: Request) -> HTMLResponse:
     return templates.TemplateResponse("train.html", {
         "request": request
     })
 
 # Firefly Webhook Endpoint
 @app.post("/webhook/firefly")
-async def firefly_webhook(request: Request):
+async def firefly_webhook(request: Request) -> dict[str, str]:
     """
     Handle Firefly III Webhook.
     """

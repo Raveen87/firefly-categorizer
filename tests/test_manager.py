@@ -1,5 +1,6 @@
+from collections.abc import Generator
 from datetime import datetime
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -8,7 +9,7 @@ from firefly_categorizer.models import CategorizationResult, Category, Transacti
 
 
 @pytest.fixture
-def mock_classifiers():
+def mock_classifiers() -> Generator[tuple[MagicMock, MagicMock, MagicMock], None, None]:
     with patch("firefly_categorizer.manager.MemoryMatcher") as mock_mem, \
          patch("firefly_categorizer.manager.TfidfClassifier") as mock_tfidf, \
          patch("firefly_categorizer.manager.LLMClassifier") as mock_llm, \
@@ -16,7 +17,7 @@ def mock_classifiers():
 
         yield mock_mem, mock_tfidf, mock_llm
 
-def test_manager_orchestration_priority(mock_classifiers):
+def test_manager_orchestration_priority(mock_classifiers: tuple[MagicMock, MagicMock, MagicMock]) -> None:
     mock_mem_cls, mock_tfidf_cls, mock_llm_cls = mock_classifiers
 
     # Setup instances
@@ -33,6 +34,7 @@ def test_manager_orchestration_priority(mock_classifiers):
         category=Category(name="MemoryCat"), confidence=1.0, source="memory"
     )
     res = service.categorize(t)
+    assert res is not None
     assert res.category.name == "MemoryCat"
     assert res.source == "memory"
     tfidf_instance.classify.assert_not_called()
@@ -43,6 +45,7 @@ def test_manager_orchestration_priority(mock_classifiers):
         category=Category(name="TfidfCat"), confidence=0.8, source="tfidf"
     )
     res = service.categorize(t)
+    assert res is not None
     assert res.category.name == "TfidfCat"
     assert res.source == "tfidf"
     llm_instance.classify.assert_not_called()
@@ -53,5 +56,6 @@ def test_manager_orchestration_priority(mock_classifiers):
         category=Category(name="LLMCat"), confidence=0.9, source="llm"
     )
     res = service.categorize(t)
+    assert res is not None
     assert res.category.name == "LLMCat"
     assert res.source == "llm"

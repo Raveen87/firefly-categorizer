@@ -23,7 +23,7 @@ class ColourizedFormatter(logging.Formatter):
         logging.CRITICAL: BOLD_RED,
     }
 
-    def format(self, record):
+    def format(self, record: logging.LogRecord) -> str:
         # Save original levelname
         orig_levelname = record.levelname
 
@@ -38,7 +38,7 @@ class ColourizedFormatter(logging.Formatter):
         record.levelname = orig_levelname
         return result
 
-def get_logging_config():
+def get_logging_config() -> dict:
     log_level_name = os.getenv("LOG_LEVEL", "INFO").upper()
 
     return {
@@ -80,8 +80,8 @@ def get_logging_config():
         },
     }
 
-def setup_logging():
+def setup_logging() -> None:
     logging.config.dictConfig(get_logging_config())
 
-def get_logger(name: str):
+def get_logger(name: str) -> logging.Logger:
     return logging.getLogger(name)

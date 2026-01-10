@@ -1,6 +1,5 @@
 import json
 import os
-from typing import Dict, List, Optional
 
 from rapidfuzz import fuzz, process
 
@@ -13,27 +12,29 @@ class MemoryMatcher(Classifier):
     def __init__(self, data_path: str = "memory.json", threshold: float = 90.0):
         self.data_path = data_path
         self.threshold = threshold
-        self.memory: Dict[str, str] = {} # description -> category_name
+        self.memory: dict[str, str] = {} # description -> category_name
         self.load()
 
-    def load(self):
+    def load(self) -> None:
         if os.path.exists(self.data_path):
             try:
-                with open(self.data_path, "r") as f:
+                with open(self.data_path) as f:
                     self.memory = json.load(f)
             except json.JSONDecodeError:
                 self.memory = {}
 
-    def save(self):
+    def save(self) -> None:
         with open(self.data_path, "w") as f:
             json.dump(self.memory, f, indent=2)
 
-    def classify(self, transaction: Transaction, valid_categories: Optional[List[str]] = None) -> Optional[CategorizationResult]:
+    def classify(
+        self, transaction: Transaction, valid_categories: list[str] | None = None
+    ) -> CategorizationResult | None:
         if not self.memory:
             return None
 
         # Helper to check validity
-        def is_valid(cat_name):
+        def is_valid(cat_name: str) -> bool:
             if valid_categories is None:
                 return True
             return cat_name in valid_categories
@@ -69,10 +70,10 @@ class MemoryMatcher(Classifier):
 
         return None
 
-    def learn(self, transaction: Transaction, category: Category):
+    def learn(self, transaction: Transaction, category: Category) -> None:
         self.memory[transaction.description] = category.name
         self.save()
 
-    def clear(self):
+    def clear(self) -> None:
         self.memory = {}
         self.save()

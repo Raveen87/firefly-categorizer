@@ -1,5 +1,4 @@
 from datetime import datetime
-from typing import Optional
 
 from pydantic import BaseModel
 
@@ -8,15 +7,15 @@ class Transaction(BaseModel):
     description: str
     amount: float
     date: datetime
-    account_name: Optional[str] = None
+    account_name: str | None = None
     currency: str = "EUR"
 
 class Category(BaseModel):
     name: str
-    id: Optional[str] = None # Firefly ID or internal ID
+    id: str | None = None # Firefly ID or internal ID
 
 class CategorizationResult(BaseModel):
     category: Category
     confidence: float # 0.0 to 1.0
     source: str # "memory", "tfidf", "llm"
-    model_version: Optional[str] = None
+    model_version: str | None = None

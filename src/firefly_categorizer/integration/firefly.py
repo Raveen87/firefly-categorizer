@@ -1,6 +1,7 @@
 import os
+from collections.abc import AsyncGenerator
 from datetime import datetime
-from typing import List, Optional
+from typing import Any
 
 import httpx
 
@@ -9,7 +10,7 @@ from firefly_categorizer.logger import get_logger
 logger = get_logger(__name__)
 
 class FireflyClient:
-    def __init__(self, base_url: Optional[str] = None, token: Optional[str] = None):
+    def __init__(self, base_url: str | None = None, token: str | None = None):
         self.base_url = base_url or os.getenv("FIREFLY_URL")
         self.token = token or os.getenv("FIREFLY_TOKEN")
         self.headers = {
@@ -18,7 +19,13 @@ class FireflyClient:
             "Accept": "application/json",
         }
 
-    async def get_transactions(self, start_date: Optional[datetime] = None, end_date: Optional[datetime] = None, limit: int = 50, page: int = 1) -> dict:
+    async def get_transactions(
+        self,
+        start_date: datetime | None = None,
+        end_date: datetime | None = None,
+        limit: int = 50,
+        page: int = 1,
+    ) -> dict:
         if not self.base_url or not self.token:
             logger.error("Firefly credentials missing.")
             return {"data": [], "meta": {}}
@@ -83,7 +90,10 @@ class FireflyClient:
                     total_count = meta.get("total", len(all_transactions))
                     total_pages = meta.get("total_pages", 1)
 
-                    logger.info(f"[TRAIN] Fetched page {page}/{total_pages}: {len(all_transactions)}/{total_count} transactions")
+                    logger.info(
+                        f"[TRAIN] Fetched page {page}/{total_pages}: "
+                        f"{len(all_transactions)}/{total_count} transactions"
+                    )
 
                     if page >= total_pages:
                         break
@@ -99,7 +109,9 @@ class FireflyClient:
             "pages_fetched": page
         }
 
-    async def yield_transactions(self, limit_per_page: int = 500):
+    async def yield_transactions(
+        self, limit_per_page: int = 500
+    ) -> AsyncGenerator[tuple[list[dict[str, Any]], dict[str, Any]], None]:
         """Async generator that yields pages of transactions and metadata."""
         if not self.base_url or not self.token:
             return
@@ -140,7 +152,7 @@ class FireflyClient:
                     logger.error(f"Error fetching transactions page {page}: {e}")
                     break
 
-    async def stream_all_transactions(self, limit_per_page: int = 500):
+    async def stream_all_transactions(self, limit_per_page: int = 500) -> AsyncGenerator[dict[str, Any], None]:
         """Async generator that yields progress updates while fetching transactions."""
         if not self.base_url or not self.token:
             yield {"stage": "error", "message": "Firefly credentials missing"}
@@ -197,7 +209,7 @@ class FireflyClient:
             "total": total_count
         }
 
-    async def get_categories(self) -> List[dict]:
+    async def get_categories(self) -> list[dict]:
         if not self.base_url or not self.token:
             return []
 
