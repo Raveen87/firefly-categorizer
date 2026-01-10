@@ -38,6 +38,9 @@ service: CategorizerService | None = None
 firefly: FireflyClient | None = None
 templates = Jinja2Templates(directory=os.path.join(os.path.dirname(__file__), "web/templates"))
 
+def _is_all_scope(scope: str | None) -> bool:
+    return (scope or "").lower() == "all"
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     global service, firefly
@@ -272,6 +275,7 @@ async def learn_transaction(req: LearnRequest) -> dict[str, Any]:
 async def categorize_stream(
     start_date: str | None = None,
     end_date: str | None = None,
+    scope: str | None = None,
     page: int = 1,
     limit: int = 50
 ) -> StreamingResponse:
@@ -281,18 +285,23 @@ async def categorize_stream(
             return
 
         # Use same logic as get_transactions to fetch raw data
-        # Default dates: last 30 days
-        if not start_date:
-            s_date = datetime.now() - timedelta(days=30)
-            start_date_obj = s_date
+        use_all_scope = _is_all_scope(scope)
+        if use_all_scope:
+            start_date_obj = None
+            end_date_obj = None
         else:
-            start_date_obj = datetime.strptime(start_date, "%Y-%m-%d")
+            # Default dates: last 30 days
+            if not start_date:
+                s_date = datetime.now() - timedelta(days=30)
+                start_date_obj = s_date
+            else:
+                start_date_obj = datetime.strptime(start_date, "%Y-%m-%d")
 
-        if not end_date:
-            e_date = datetime.now()
-            end_date_obj = e_date
-        else:
-            end_date_obj = datetime.strptime(end_date, "%Y-%m-%d")
+            if not end_date:
+                e_date = datetime.now()
+                end_date_obj = e_date
+            else:
+                end_date_obj = datetime.strptime(end_date, "%Y-%m-%d")
 
         result = await firefly.get_transactions(
             start_date=start_date_obj,
@@ -369,6 +378,7 @@ async def categorize_stream(
 async def get_transactions(
     start_date: str | None = None,
     end_date: str | None = None,
+    scope: str | None = None,
     predict: bool = False,
     page: int = 1,
     limit: int = 50
@@ -382,18 +392,23 @@ async def get_transactions(
         raw_cats = await firefly.get_categories()
         category_list = sorted([c["attributes"]["name"] for c in raw_cats])
 
-        # Default dates: last 30 days
-        if not start_date:
-            s_date = datetime.now() - timedelta(days=30)
-            start_date_obj = s_date
+        use_all_scope = _is_all_scope(scope)
+        if use_all_scope:
+            start_date_obj = None
+            end_date_obj = None
         else:
-            start_date_obj = datetime.strptime(start_date, "%Y-%m-%d")
+            # Default dates: last 30 days
+            if not start_date:
+                s_date = datetime.now() - timedelta(days=30)
+                start_date_obj = s_date
+            else:
+                start_date_obj = datetime.strptime(start_date, "%Y-%m-%d")
 
-        if not end_date:
-            e_date = datetime.now()
-            end_date_obj = e_date
-        else:
-            end_date_obj = datetime.strptime(end_date, "%Y-%m-%d")
+            if not end_date:
+                e_date = datetime.now()
+                end_date_obj = e_date
+            else:
+                end_date_obj = datetime.strptime(end_date, "%Y-%m-%d")
 
         result = await firefly.get_transactions(
             start_date=start_date_obj,
@@ -467,7 +482,12 @@ async def get_transactions(
     }
 
 @app.get("/", response_class=HTMLResponse)
-async def index(request: Request, start_date: str | None = None, end_date: str | None = None) -> HTMLResponse:
+async def index(
+    request: Request,
+    start_date: str | None = None,
+    end_date: str | None = None,
+    scope: str | None = None
+) -> HTMLResponse:
     category_list = []
     if firefly:
         raw_cats = await firefly.get_categories()
@@ -479,11 +499,14 @@ async def index(request: Request, start_date: str | None = None, end_date: str |
     if not end_date:
         end_date = datetime.now().strftime("%Y-%m-%d")
 
+    scope_mode = "all" if _is_all_scope(scope) else "range"
+
     return templates.TemplateResponse("index.html", {
         "request": request,
         "categories": category_list,
         "start_date": start_date,
-        "end_date": end_date
+        "end_date": end_date,
+        "scope": scope_mode
     })
 
 @app.get("/help", response_class=HTMLResponse)
