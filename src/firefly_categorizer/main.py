@@ -1,19 +1,21 @@
-from fastapi import FastAPI, HTTPException, Request, Form
-from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
-from fastapi.responses import HTMLResponse, StreamingResponse
-from pydantic import BaseModel
 import json
-from firefly_categorizer.models import Transaction, Category, CategorizationResult
-from firefly_categorizer.manager import CategorizerService
-from firefly_categorizer.integration.firefly import FireflyClient
-from firefly_categorizer.logger import setup_logging, get_logger, get_logging_config
-from typing import List, Optional
 import os
-import uvicorn
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
+from typing import Optional
+
+import uvicorn
 from dotenv import load_dotenv
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import HTMLResponse, StreamingResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+from pydantic import BaseModel
+
+from firefly_categorizer.integration.firefly import FireflyClient
+from firefly_categorizer.logger import get_logger, get_logging_config, setup_logging
+from firefly_categorizer.manager import CategorizerService
+from firefly_categorizer.models import CategorizationResult, Category, Transaction
 
 # Load environment variables
 load_dotenv()
@@ -32,11 +34,11 @@ async def lifespan(app: FastAPI):
     global service, firefly
     # Initialize service on startup
     logger.info("Initializing services...")
-    
+
     # Check Environment Variables
     if not os.getenv("FIREFLY_URL") or not os.getenv("FIREFLY_TOKEN"):
         logger.warning("FIREFLY_URL or FIREFLY_TOKEN not set. Firefly integration will be disabled.")
-    
+
     if not os.getenv("OPENAI_API_KEY"):
         logger.info("OPENAI_API_KEY not set. OpenAI integration will be disabled.")
 
@@ -67,7 +69,7 @@ class LearnRequest(BaseModel):
 async def categorize_transaction(req: CategorizeRequest):
     if not service:
         raise HTTPException(status_code=500, detail="Service not initialized")
-    
+
     valid_cats = None
     if firefly:
         # Fetch valid categories to constrain prediction
@@ -93,16 +95,16 @@ async def train_models():
         raise HTTPException(status_code=500, detail="Service not initialized")
     if not firefly:
         raise HTTPException(status_code=500, detail="Firefly not configured")
-    
+
     logger.info("[TRAIN] Starting bulk training from Firefly data...")
-    
+
     trained_count = 0
     skipped_count = 0
     total_fetched = 0
-    
+
     async for page_txs, _ in firefly.yield_transactions():
         total_fetched += len(page_txs)
-        
+
         for t_data in page_txs:
             attrs = t_data.get("attributes", {}).get("transactions", [{}])[0]
             desc = attrs.get("description", "")
@@ -110,32 +112,32 @@ async def train_models():
             curr = attrs.get("currency_code", "EUR")
             date_str = attrs.get("date", "")
             category_name = attrs.get("category_name")
-            
+
             # Skip uncategorized transactions
             if not category_name:
                 skipped_count += 1
                 continue
-            
+
             try:
                 dt = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
             except ValueError:
                 dt = datetime.now()
-            
+
             tx_obj = Transaction(
                 description=desc,
                 amount=amount,
                 date=dt,
                 currency=curr
             )
-            
+
             # Train the models
             service.learn(tx_obj, Category(name=category_name))
             trained_count += 1
-            
+
         logger.info(f"[TRAIN] Processed page. Total trained so far: {trained_count}")
-    
+
     logger.info(f"[TRAIN] Complete! Trained: {trained_count}, Skipped (no category): {skipped_count}")
-    
+
     return {
         "status": "success",
         "trained": trained_count,
@@ -153,22 +155,22 @@ async def train_stream():
         if not service or not firefly:
             yield f"data: {json.dumps({'stage': 'error', 'message': 'Service not initialized'})}\n\n"
             return
-        
+
         trained_count = 0
         skipped_count = 0
         total_fetched = 0
         total_estimate = 0
-        
+
         # Notify start
         yield f"data: {json.dumps({'stage': 'start'})}\n\n"
-        
+
         async for page_txs, meta in firefly.yield_transactions():
             # Update total estimate from metadata
             if total_estimate == 0:
                 total_estimate = meta.get("total", 0)
-            
+
             total_fetched += len(page_txs)
-            
+
             # Process this page
             for t_data in page_txs:
                 attrs = t_data.get("attributes", {}).get("transactions", [{}])[0]
@@ -177,40 +179,40 @@ async def train_stream():
                 curr = attrs.get("currency_code", "EUR")
                 date_str = attrs.get("date", "")
                 category_name = attrs.get("category_name")
-                
+
                 if not category_name:
                     skipped_count += 1
                     continue
-                
+
                 try:
                     dt = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
                 except ValueError:
                     dt = datetime.now()
-                
+
                 tx_obj = Transaction(
                     description=desc,
                     amount=amount,
                     date=dt,
                     currency=curr
                 )
-                
+
                 service.learn(tx_obj, Category(name=category_name))
                 trained_count += 1
-            
+
             # Yield progress after each page
             percent = round(total_fetched / total_estimate * 100, 1) if total_estimate > 0 else 0
             yield f"data: {json.dumps({'stage': 'processing', 'trained': trained_count, 'skipped': skipped_count, 'fetched': total_fetched, 'total': total_estimate, 'percent': percent})}\n\n"
-        
+
         # Stage Complete
         yield f"data: {json.dumps({'stage': 'complete', 'trained': trained_count, 'skipped': skipped_count, 'total_fetched': total_fetched})}\n\n"
-    
+
     return StreamingResponse(generate(), media_type="text/event-stream")
 
 @app.post("/clear-models")
 async def clear_models():
     if not service:
         raise HTTPException(status_code=500, detail="Service not initialized")
-    
+
     service.clear_models()
     return {"status": "success", "message": "All models cleared"}
 
@@ -218,17 +220,17 @@ async def clear_models():
 async def learn_transaction(req: LearnRequest):
     if not service:
         raise HTTPException(status_code=500, detail="Service not initialized")
-    
+
     # Determine if this was model-suggested or manual
     is_model_suggested = req.suggested_category and req.suggested_category == req.category.name
     source = "model" if is_model_suggested else "manual"
-    
+
     # Log the categorization
     logger.info(f"[CATEGORIZE] Transaction ID: {req.transaction_id or 'N/A'} -> Category: '{req.category.name}' (Source: {source})")
-    
+
     # 1. Update Local Models
     service.learn(req.transaction, req.category)
-    
+
     # 2. Update Firefly III (if ID provided)
     firefly_update_status = "skipped"
     if firefly and req.transaction_id:
@@ -236,7 +238,7 @@ async def learn_transaction(req: LearnRequest):
         firefly_update_status = "success" if success else "failed"
 
     return {
-        "status": "success", 
+        "status": "success",
         "message": "Learned new transaction",
         "firefly_update": firefly_update_status,
         "source": source
@@ -244,8 +246,8 @@ async def learn_transaction(req: LearnRequest):
 
 @app.get("/api/transactions")
 async def get_transactions(
-    start_date: str = None, 
-    end_date: str = None, 
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
     predict: bool = False,
     page: int = 1,
     limit: int = 50
@@ -253,7 +255,7 @@ async def get_transactions(
     transactions_display = []
     category_list = []
     pagination = {}
-    
+
     if firefly:
         # Fetch categories to validate predictions
         raw_cats = await firefly.get_categories()
@@ -273,18 +275,18 @@ async def get_transactions(
             end_date_obj = datetime.strptime(end_date, "%Y-%m-%d")
 
         result = await firefly.get_transactions(
-            start_date=start_date_obj, 
+            start_date=start_date_obj,
             end_date=end_date_obj,
             page=page,
             limit=limit
         )
-        
+
         raw_txs = result.get("data", [])
         pagination = result.get("meta", {})
-        
+
         # Get auto-approve threshold from env (0 = disabled)
         auto_approve_threshold = float(os.getenv("AUTO_APPROVE_THRESHOLD", "0"))
-        
+
         for t_data in raw_txs:
             attrs = t_data.get("attributes", {}).get("transactions", [{}])[0]
             desc = attrs.get("description", "")
@@ -304,13 +306,13 @@ async def get_transactions(
                 date=dt,
                 currency=curr
             )
-            
+
             # Only predict if not already categorized
             prediction = None
             auto_approved = False
             if predict and not existing_cat:
                 prediction = service.categorize(tx_obj, valid_categories=category_list if category_list else None)
-                
+
                 # Auto-approve if confidence exceeds threshold
                 if prediction and auto_approve_threshold > 0 and prediction.confidence >= auto_approve_threshold:
                     logger.info(f"[AUTO-APPROVE] Transaction {tx_id}: '{prediction.category.name}' (confidence: {prediction.confidence:.2f} >= {auto_approve_threshold})")
@@ -322,7 +324,7 @@ async def get_transactions(
                         existing_cat = prediction.category.name  # Mark as categorized
                         auto_approved = True
                         prediction = None  # Clear prediction since it's now saved
-            
+
             transactions_display.append({
                 "id": tx_id,
                 "date_formatted": dt.strftime("%Y-%m-%d"),
@@ -341,7 +343,7 @@ async def get_transactions(
     }
 
 @app.get("/", response_class=HTMLResponse)
-async def index(request: Request, start_date: str = None, end_date: str = None):
+async def index(request: Request, start_date: Optional[str] = None, end_date: Optional[str] = None):
     category_list = []
     if firefly:
         raw_cats = await firefly.get_categories()
@@ -352,7 +354,7 @@ async def index(request: Request, start_date: str = None, end_date: str = None):
         start_date = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d")
     if not end_date:
         end_date = datetime.now().strftime("%Y-%m-%d")
-            
+
     return templates.TemplateResponse("index.html", {
         "request": request,
         "categories": category_list,

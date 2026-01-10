@@ -1,13 +1,15 @@
 import os
-import httpx
-from typing import List, Optional
 from datetime import datetime
+from typing import List, Optional
+
+import httpx
+
 from firefly_categorizer.logger import get_logger
 
 logger = get_logger(__name__)
 
 class FireflyClient:
-    def __init__(self, base_url: str = None, token: str = None):
+    def __init__(self, base_url: Optional[str] = None, token: Optional[str] = None):
         self.base_url = base_url or os.getenv("FIREFLY_URL")
         self.token = token or os.getenv("FIREFLY_TOKEN")
         self.headers = {
@@ -16,11 +18,11 @@ class FireflyClient:
             "Accept": "application/json",
         }
 
-    async def get_transactions(self, start_date: datetime = None, end_date: datetime = None, limit: int = 50, page: int = 1) -> dict:
+    async def get_transactions(self, start_date: Optional[datetime] = None, end_date: Optional[datetime] = None, limit: int = 50, page: int = 1) -> dict:
         if not self.base_url or not self.token:
             logger.error("Firefly credentials missing.")
             return {"data": [], "meta": {}}
-            
+
         async with httpx.AsyncClient() as client:
             try:
                 # Firefly API filtering by date is via query params
@@ -33,7 +35,7 @@ class FireflyClient:
                     params["start"] = start_date.strftime("%Y-%m-%d")
                 if end_date:
                     params["end"] = end_date.strftime("%Y-%m-%d")
-                    
+
                 response = await client.get(f"{self.base_url}/api/v1/transactions", headers=self.headers, params=params)
                 response.raise_for_status()
                 data = response.json()
@@ -49,12 +51,12 @@ class FireflyClient:
         """Fetch all transactions with pagination. Returns dict with transactions and metadata."""
         if not self.base_url or not self.token:
             return {"transactions": [], "total": 0}
-        
+
         all_transactions = []
         page = 1
         total_count = 0
         total_pages = 1
-        
+
         async with httpx.AsyncClient(timeout=60.0) as client:
             while True:
                 try:
@@ -63,34 +65,34 @@ class FireflyClient:
                         "page": page,
                     }
                     response = await client.get(
-                        f"{self.base_url}/api/v1/transactions", 
-                        headers=self.headers, 
+                        f"{self.base_url}/api/v1/transactions",
+                        headers=self.headers,
                         params=params
                     )
                     response.raise_for_status()
                     data = response.json()
                     transactions = data.get("data", [])
-                    
+
                     if not transactions:
                         break
-                    
+
                     all_transactions.extend(transactions)
-                    
+
                     # Get pagination metadata
                     meta = data.get("meta", {}).get("pagination", {})
                     total_count = meta.get("total", len(all_transactions))
                     total_pages = meta.get("total_pages", 1)
-                    
+
                     logger.info(f"[TRAIN] Fetched page {page}/{total_pages}: {len(all_transactions)}/{total_count} transactions")
-                    
+
                     if page >= total_pages:
                         break
-                    
+
                     page += 1
                 except Exception as e:
                     logger.error(f"Error fetching transactions page {page}: {e}")
                     break
-        
+
         return {
             "transactions": all_transactions,
             "total": total_count,
@@ -101,10 +103,10 @@ class FireflyClient:
         """Async generator that yields pages of transactions and metadata."""
         if not self.base_url or not self.token:
             return
-        
+
         page = 1
         total_pages = 1
-        
+
         async with httpx.AsyncClient(timeout=60.0) as client:
             while True:
                 try:
@@ -113,26 +115,26 @@ class FireflyClient:
                         "page": page,
                     }
                     response = await client.get(
-                        f"{self.base_url}/api/v1/transactions", 
-                        headers=self.headers, 
+                        f"{self.base_url}/api/v1/transactions",
+                        headers=self.headers,
                         params=params
                     )
                     response.raise_for_status()
                     data = response.json()
                     transactions = data.get("data", [])
-                    
+
                     if not transactions:
                         break
-                    
+
                     # Get pagination metadata
                     meta = data.get("meta", {}).get("pagination", {})
                     total_pages = meta.get("total_pages", 1)
-                    
+
                     yield transactions, meta
-                    
+
                     if page >= total_pages:
                         break
-                    
+
                     page += 1
                 except Exception as e:
                     logger.error(f"Error fetching transactions page {page}: {e}")
@@ -143,35 +145,35 @@ class FireflyClient:
         if not self.base_url or not self.token:
             yield {"stage": "error", "message": "Firefly credentials missing"}
             return
-        
+
         all_transactions = []
         page = 1
         total_count = 0
         total_pages = 1
-        
+
         async with httpx.AsyncClient(timeout=60.0) as client:
             # First request to get total count
             while True:
                 try:
                     params = {"limit": limit_per_page, "page": page}
                     response = await client.get(
-                        f"{self.base_url}/api/v1/transactions", 
-                        headers=self.headers, 
+                        f"{self.base_url}/api/v1/transactions",
+                        headers=self.headers,
                         params=params
                     )
                     response.raise_for_status()
                     data = response.json()
                     transactions = data.get("data", [])
-                    
+
                     if not transactions:
                         break
-                    
+
                     all_transactions.extend(transactions)
-                    
+
                     meta = data.get("meta", {}).get("pagination", {})
                     total_count = meta.get("total", len(all_transactions))
                     total_pages = meta.get("total_pages", 1)
-                    
+
                     # Yield fetch progress
                     yield {
                         "stage": "fetching",
@@ -179,15 +181,15 @@ class FireflyClient:
                         "total": total_count,
                         "percent": round(len(all_transactions) / total_count * 100, 1) if total_count > 0 else 0
                     }
-                    
+
                     if page >= total_pages:
                         break
                     page += 1
-                    
+
                 except Exception as e:
                     yield {"stage": "error", "message": str(e)}
                     return
-        
+
         # Yield final fetch complete with all transactions
         yield {
             "stage": "fetch_complete",
@@ -198,7 +200,7 @@ class FireflyClient:
     async def get_categories(self) -> List[dict]:
         if not self.base_url or not self.token:
             return []
-            
+
         async with httpx.AsyncClient() as client:
             try:
                 # Firefly API for categories
@@ -213,7 +215,7 @@ class FireflyClient:
     async def update_transaction(self, transaction_id: str, category_name: str) -> bool:
         if not self.base_url or not self.token:
             return False
-            
+
         async with httpx.AsyncClient() as client:
             try:
                 # Update transaction category
@@ -226,7 +228,7 @@ class FireflyClient:
                     ]
                 }
                 response = await client.put(
-                    f"{self.base_url}/api/v1/transactions/{transaction_id}", 
+                    f"{self.base_url}/api/v1/transactions/{transaction_id}",
                     headers=self.headers,
                     json=payload
                 )

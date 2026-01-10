@@ -1,11 +1,15 @@
-import pickle
 import os
-from typing import Optional, List, Tuple
+import pickle
+from typing import List, Optional
+
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import SGDClassifier
 from sklearn.pipeline import Pipeline
-from firefly_categorizer.models import Transaction, CategorizationResult, Category
+
+from firefly_categorizer.models import CategorizationResult, Category, Transaction
+
 from .base import Classifier
+
 
 class TfidfClassifier(Classifier):
     def __init__(self, data_path: str = "tfidf_model.pkl", threshold: float = 0.5):
@@ -45,7 +49,7 @@ class TfidfClassifier(Classifier):
     def classify(self, transaction: Transaction, valid_categories: Optional[List[str]] = None) -> Optional[CategorizationResult]:
         if not self.is_fitted:
             return None
-            
+
         try:
             probs = self.pipeline.predict_proba([transaction.description])[0]
             max_prob_idx = probs.argmax()
@@ -62,13 +66,13 @@ class TfidfClassifier(Classifier):
         except Exception:
             # Handle cases where vocabulary might not match, though Tfidf handles this gracefully mainly
             pass
-            
+
         return None
 
     def learn(self, transaction: Transaction, category: Category):
         self.examples.append(transaction.description)
         self.labels.append(category.name)
-        
+
         # In a real heavy production system, we wouldn't retrain on every single learn,
         # but for personal finance volume, this is fine and ensures immediate feedback.
         if len(set(self.labels)) >= 2:

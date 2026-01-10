@@ -1,7 +1,9 @@
 
-from fastapi.testclient import TestClient
-from firefly_categorizer.main import app
 import re
+
+from fastapi.testclient import TestClient
+
+from firefly_categorizer.main import app
 
 client = TestClient(app)
 
@@ -9,7 +11,7 @@ def test_index_params():
     response = client.get("/?start_date=2023-02-01&end_date=2023-02-28")
     assert response.status_code == 200
     content = response.text
-    
+
     # Check start_date value in input
     match_start = re.search(r'name="start_date" class="border p-2 rounded" value="([^"]*)"', content)
     if match_start:

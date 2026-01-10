@@ -1,14 +1,17 @@
 import os
-from typing import Optional, List
+from typing import List, Optional
+
 from openai import OpenAI
-from firefly_categorizer.models import Transaction, CategorizationResult, Category
-from .base import Classifier
+
 from firefly_categorizer.logger import get_logger
+from firefly_categorizer.models import CategorizationResult, Category, Transaction
+
+from .base import Classifier
 
 logger = get_logger(__name__)
 
 class LLMClassifier(Classifier):
-    def __init__(self, api_key: str = None, model: str = "gpt-3.5-turbo", base_url: str = None):
+    def __init__(self, api_key: Optional[str] = None, model: str = "gpt-3.5-turbo", base_url: Optional[str] = None):
         self.client = OpenAI(
             api_key=api_key or os.getenv("OPENAI_API_KEY"),
             base_url=base_url or os.getenv("OPENAI_BASE_URL") or None
@@ -31,7 +34,7 @@ class LLMClassifier(Classifier):
             
             Return ONLY the category name. If unsure or if it doesn't fit any valid category, return 'Uncategorized'.
             """
-            
+
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=[
@@ -40,13 +43,13 @@ class LLMClassifier(Classifier):
                 ],
                 temperature=0.0
             )
-            
+
             category_name = response.choices[0].message.content.strip()
 
             if valid_categories:
                 if category_name not in valid_categories:
                     return None
-            
+
             # Simple heuristic for confidence (LLMs are usually confident)
             return CategorizationResult(
                 category=Category(name=category_name),

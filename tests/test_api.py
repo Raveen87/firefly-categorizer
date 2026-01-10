@@ -1,8 +1,10 @@
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
-from unittest.mock import MagicMock, patch, AsyncMock
 from fastapi.testclient import TestClient
+
 from firefly_categorizer.main import app
-from firefly_categorizer.models import Transaction, Category, CategorizationResult
+from firefly_categorizer.models import CategorizationResult, Category
 
 client = TestClient(app)
 
@@ -64,7 +66,7 @@ def test_get_transactions_with_predict(mock_firefly, mock_service):
         ],
         "meta": {"total": 1}
     }
-    
+
     # Mock prediction
     mock_service.categorize.return_value = CategorizationResult(
         category=Category(name="Food"),
@@ -76,7 +78,7 @@ def test_get_transactions_with_predict(mock_firefly, mock_service):
     assert response.status_code == 200
     data = response.json()
     assert len(data["transactions"]) == 1
-    
+
     # Should have called categorize
     mock_service.categorize.assert_called_once()
     assert data["transactions"][0]["prediction"] is not None

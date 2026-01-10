@@ -1,8 +1,10 @@
-import os
-import pytest
 from datetime import datetime
-from firefly_categorizer.models import Transaction, Category
+
+import pytest
+
 from firefly_categorizer.classifiers.memory import MemoryMatcher
+from firefly_categorizer.models import Category, Transaction
+
 
 @pytest.fixture
 def memory_matcher(tmp_path):
@@ -12,12 +14,12 @@ def memory_matcher(tmp_path):
 def test_memory_learn_and_exact_match(memory_matcher):
     t1 = Transaction(description="Spotify Premium", amount=10.99, date=datetime.now())
     c1 = Category(name="Subscriptions")
-    
+
     memory_matcher.learn(t1, c1)
-    
+
     # Reload to verify persistence
     memory_matcher.load()
-    
+
     res = memory_matcher.classify(t1)
     assert res is not None
     assert res.category.name == "Subscriptions"
@@ -28,10 +30,10 @@ def test_memory_fuzzy_match(memory_matcher):
     t1 = Transaction(description="Uber Ride", amount=15.50, date=datetime.now())
     c1 = Category(name="Transport")
     memory_matcher.learn(t1, c1)
-    
+
     # Slightly different description
     t2 = Transaction(description="Uber Ride XL", amount=15.50, date=datetime.now())
-    
+
     res = memory_matcher.classify(t2)
     assert res is not None
     assert res.category.name == "Transport"

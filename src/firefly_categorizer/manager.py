@@ -1,36 +1,37 @@
-from typing import Optional, List
-from firefly_categorizer.models import Transaction, CategorizationResult, Category
+import os
+from typing import List, Optional
+
 from firefly_categorizer.classifiers.base import Classifier
+from firefly_categorizer.classifiers.llm import LLMClassifier
 from firefly_categorizer.classifiers.memory import MemoryMatcher
 from firefly_categorizer.classifiers.tfidf import TfidfClassifier
-from firefly_categorizer.classifiers.llm import LLMClassifier
 from firefly_categorizer.logger import get_logger
-import os
+from firefly_categorizer.models import CategorizationResult, Category, Transaction
 
 logger = get_logger(__name__)
 
 class CategorizerService:
-    def __init__(self, 
+    def __init__(self,
                  memory_threshold: float = 90.0,
                  tfidf_threshold: float = 0.5,
                  data_dir: str = "."):
-        
+
         self.classifiers: List[Classifier] = []
-        
+
         # 1. Memory Matcher (Highest priority)
         self.memory = MemoryMatcher(
             data_path=os.path.join(data_dir, "memory.json"),
             threshold=memory_threshold
         )
         self.classifiers.append(self.memory)
-        
+
         # 2. TF-IDF Classifier
         self.tfidf = TfidfClassifier(
             data_path=os.path.join(data_dir, "tfidf.pkl"),
             threshold=tfidf_threshold
         )
         self.classifiers.append(self.tfidf)
-        
+
         # 3. LLM Classifier (Fallback)
         # Only add if API key is present
         api_key = os.getenv("OPENAI_API_KEY")
@@ -48,15 +49,15 @@ class CategorizerService:
         for classifier in self.classifiers:
             classifier_name = classifier.__class__.__name__
             logger.debug(f"Trying {classifier_name} for: '{transaction.description[:50]}...'")
-            
+
             result = classifier.classify(transaction, valid_categories=valid_categories)
-            
+
             if result:
                 logger.debug(f"{classifier_name} returned: '{result.category.name}' (confidence: {result.confidence:.2f})")
                 return result
             else:
                 logger.debug(f"{classifier_name} returned: None")
-        
+
         logger.debug(f"No classifier matched for: '{transaction.description[:50]}...'")
         return None
 

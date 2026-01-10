@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
-from typing import Optional, List
-from firefly_categorizer.models import Transaction, CategorizationResult, Category
+from typing import List, Optional
+
+from firefly_categorizer.models import CategorizationResult, Category, Transaction
+
 
 class Classifier(ABC):
     @abstractmethod

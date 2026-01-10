@@ -9,6 +9,10 @@ wheels/
 # Virtual environments
 .venv
 
+# IDE and editor files
+.vscode/
+.idea/
+
 # User data
 memory.json
 *.pkl

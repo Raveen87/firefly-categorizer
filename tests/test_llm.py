@@ -1,8 +1,11 @@
-import pytest
-from unittest.mock import MagicMock, patch
 from datetime import datetime
-from firefly_categorizer.models import Transaction
+from unittest.mock import MagicMock, patch
+
+import pytest
+
 from firefly_categorizer.classifiers.llm import LLMClassifier
+from firefly_categorizer.models import Transaction
+
 
 @pytest.fixture
 def mock_openai_client():
@@ -18,12 +21,12 @@ def test_llm_classify(mock_openai_client):
 
     classifier = LLMClassifier(api_key="sk-fake", model="gpt-4")
     t = Transaction(description="Whole Foods", amount=100.0, date=datetime.now())
-    
+
     res = classifier.classify(t)
-    
+
     assert res is not None
     assert res.category.name == "Groceries"
     assert res.source == "llm"
-    
+
     # Verify call
     mock_instance.chat.completions.create.assert_called_once()

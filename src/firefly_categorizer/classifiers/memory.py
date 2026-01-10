@@ -1,9 +1,13 @@
 import json
 import os
-from typing import Optional, Dict, List
-from rapidfuzz import process, fuzz
-from firefly_categorizer.models import Transaction, CategorizationResult, Category
+from typing import Dict, List, Optional
+
+from rapidfuzz import fuzz, process
+
+from firefly_categorizer.models import CategorizationResult, Category, Transaction
+
 from .base import Classifier
+
 
 class MemoryMatcher(Classifier):
     def __init__(self, data_path: str = "memory.json", threshold: float = 90.0):
@@ -51,7 +55,7 @@ class MemoryMatcher(Classifier):
             self.memory.keys(),
             scorer=fuzz.token_sort_ratio
         )
-        
+
         if result:
             match_description, score, _ = result
             if score >= self.threshold:
