@@ -149,6 +149,7 @@
         let itemsPerPage = 50;
         let totalPages = 1;
         let totalTransactions = 0;
+        let renderScheduled = false;
     </script>
 
     <script>
@@ -156,8 +157,66 @@
             fetchTransactions();
         });
 
+        function scheduleRender() {
+            if (renderScheduled) {
+                return;
+            }
+            renderScheduled = true;
+            requestAnimationFrame(() => {
+                renderScheduled = false;
+                renderTransactions();
+            });
+        }
+
         function runCategorization() {
-            fetchTransactions(true);
+            const loadingState = document.getElementById('loading-state');
+            const loadingText = document.getElementById('loading-text');
+            
+            loadingText.textContent = "Categorizing...";
+            loadingState.classList.remove('hidden');
+
+            const params = new URLSearchParams(window.location.search);
+            params.append('page', currentPage);
+            params.append('limit', itemsPerPage);
+
+            const eventSource = new EventSource(`/api/categorize-stream?${params.toString()}`);
+
+            eventSource.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+                
+                // Find and update transaction
+                const idx = currentTransactions.findIndex(t => t.id === data.id);
+                if (idx !== -1) {
+                    // Update fields
+                    if (data.prediction) {
+                        currentTransactions[idx].prediction = data.prediction;
+                    }
+                    if (data.existing_category) {
+                        currentTransactions[idx].existing_category = data.existing_category;
+                    }
+                    if (data.auto_approved) {
+                        currentTransactions[idx].auto_approved = data.auto_approved;
+                    }
+                    
+                    scheduleRender();
+                }
+            };
+
+            eventSource.addEventListener('done', function(e) {
+                eventSource.close();
+                loadingState.classList.add('hidden');
+            });
+
+            eventSource.onerror = function(event) {
+                // If the connection closes unexpectedly
+                if (eventSource.readyState === EventSource.CLOSED) {
+                     loadingState.classList.add('hidden');
+                } else {
+                    console.error("EventSource failed:", event);
+                    eventSource.close();
+                    loadingState.classList.add('hidden');
+                }
+            };
         }
 
         async function fetchTransactions(predict = false) {

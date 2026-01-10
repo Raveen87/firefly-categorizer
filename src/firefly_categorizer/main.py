@@ -1,3 +1,4 @@
+import asyncio
 import json
 import os
 from collections.abc import AsyncGenerator
@@ -24,6 +25,13 @@ load_dotenv()
 # Setup logging
 setup_logging()
 logger = get_logger(__name__)
+
+# SSE headers to reduce proxy buffering and keep connections alive.
+SSE_HEADERS = {
+    "Cache-Control": "no-cache",
+    "Connection": "keep-alive",
+    "X-Accel-Buffering": "no",
+}
 
 # Global service instance
 service: CategorizerService | None = None
@@ -259,6 +267,103 @@ async def learn_transaction(req: LearnRequest) -> dict[str, Any]:
         "firefly_update": firefly_update_status,
         "source": source
     }
+
+@app.get("/api/categorize-stream")
+async def categorize_stream(
+    start_date: str | None = None,
+    end_date: str | None = None,
+    page: int = 1,
+    limit: int = 50
+) -> StreamingResponse:
+    async def generate() -> AsyncGenerator[str, None]:
+        if not service or not firefly:
+            yield f"data: {json.dumps({'error': 'Service not initialized'})}\n\n"
+            return
+
+        # Use same logic as get_transactions to fetch raw data
+        # Default dates: last 30 days
+        if not start_date:
+            s_date = datetime.now() - timedelta(days=30)
+            start_date_obj = s_date
+        else:
+            start_date_obj = datetime.strptime(start_date, "%Y-%m-%d")
+
+        if not end_date:
+            e_date = datetime.now()
+            end_date_obj = e_date
+        else:
+            end_date_obj = datetime.strptime(end_date, "%Y-%m-%d")
+
+        result = await firefly.get_transactions(
+            start_date=start_date_obj,
+            end_date=end_date_obj,
+            page=page,
+            limit=limit
+        )
+
+        raw_txs = result.get("data", [])
+
+        # Get categories for prediction context
+        raw_cats = await firefly.get_categories()
+        category_list = sorted([c["attributes"]["name"] for c in raw_cats])
+
+        auto_approve_threshold = float(os.getenv("AUTO_APPROVE_THRESHOLD", "0"))
+
+        for t_data in raw_txs:
+            attrs = t_data.get("attributes", {}).get("transactions", [{}])[0]
+            desc = attrs.get("description", "")
+            amount = float(attrs.get("amount", 0.0))
+            curr = attrs.get("currency_code", "EUR")
+            date_str = attrs.get("date", "")
+            existing_cat = attrs.get("category_name")
+            tx_id = t_data.get("id")
+
+            try:
+                dt = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
+            except ValueError:
+                dt = datetime.now()
+
+            tx_obj = Transaction(
+                description=desc,
+                amount=amount,
+                date=dt,
+                currency=curr
+            )
+
+            prediction = None
+            auto_approved = False
+
+            if not existing_cat and service:
+                prediction = await asyncio.to_thread(
+                    service.categorize,
+                    tx_obj,
+                    valid_categories=category_list if category_list else None
+                )
+
+                if prediction and auto_approve_threshold > 0 and prediction.confidence >= auto_approve_threshold:
+                     logger.info(
+                        f"[AUTO-APPROVE] Transaction {tx_id}: '{prediction.category.name}' "
+                        f"(confidence: {prediction.confidence:.2f} >= {auto_approve_threshold})"
+                    )
+                     success = await firefly.update_transaction(tx_id, prediction.category.name)
+                     if success:
+                         service.learn(tx_obj, prediction.category)
+                         existing_cat = prediction.category.name
+                         auto_approved = True
+                         prediction = None
+
+            payload = {
+                "id": tx_id,
+                "prediction": prediction.model_dump() if prediction else None,
+                "existing_category": existing_cat,
+                "auto_approved": auto_approved
+            }
+
+            yield f"data: {json.dumps(payload)}\n\n"
+
+        yield "event: done\ndata: {}\n\n"
+
+    return StreamingResponse(generate(), media_type="text/event-stream", headers=SSE_HEADERS)
 
 @app.get("/api/transactions")
 async def get_transactions(
