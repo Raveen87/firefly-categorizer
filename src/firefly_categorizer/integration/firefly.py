@@ -224,7 +224,12 @@ class FireflyClient:
                 logger.error(f"Error fetching categories: {e}")
                 return []
 
-    async def update_transaction(self, transaction_id: str, category_name: str) -> bool:
+    async def update_transaction(
+        self,
+        transaction_id: str,
+        category_name: str,
+        tags: list[str] | None = None
+    ) -> bool:
         if not self.base_url or not self.token:
             return False
 
@@ -232,12 +237,14 @@ class FireflyClient:
             try:
                 # Update transaction category
                 # Payload format: { "transactions": [ { "category_name": "New Category" } ] }
+                transaction_payload: dict[str, Any] = {
+                    "category_name": category_name
+                }
+                if tags:
+                    transaction_payload["tags"] = tags
+
                 payload = {
-                    "transactions": [
-                        {
-                            "category_name": category_name
-                        }
-                    ]
+                    "transactions": [transaction_payload]
                 }
                 response = await client.put(
                     f"{self.base_url}/api/v1/transactions/{transaction_id}",

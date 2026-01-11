@@ -1219,6 +1219,10 @@
 
             const categoryName = selectEl.value;
             const btn = document.getElementById(`btn-${transactionId}`);
+            const transaction = state.transactions.find(t => t.id === transactionId);
+            const existingTags = transaction && Array.isArray(transaction.existing_tags)
+                ? transaction.existing_tags
+                : [];
 
             if (!categoryName) {
                 alert('Please select a category first.');
@@ -1245,7 +1249,8 @@
                         transaction: transactionObj,
                         category: { name: categoryName },
                         transaction_id: transactionId,
-                        suggested_category: suggestedCategory || null
+                        suggested_category: suggestedCategory || null,
+                        existing_tags: existingTags
                     })
                 });
 

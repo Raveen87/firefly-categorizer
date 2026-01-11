@@ -18,6 +18,9 @@ A hybrid transaction categorization service for Firefly III.
     *   `FIREFLY_URL`: The full URL to your Firefly III instance (e.g., `http://192.168.1.100:8080`).
     *   `FIREFLY_TOKEN`: Your Personal Access Token. Generate this in Firefly III under **Profile > OAuth / Personal Access Tokens > Create New Token**.
     *   `OPENAI_API_KEY`: (Optional) Your OpenAI API key if you want LLM fallback.
+    *   `AUTO_APPROVE_THRESHOLD`: (Optional) Confidence threshold for auto-approval (0-1, 0 disables).
+    *   `MANUAL_TAGS`: (Optional) Comma-separated tags to apply when you click Save.
+    *   `AUTO_APPROVE_TAGS`: (Optional) Comma-separated tags to apply when auto-approval kicks in.
 
 ## Running
 

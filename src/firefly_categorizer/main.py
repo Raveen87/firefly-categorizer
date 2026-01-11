@@ -42,6 +42,100 @@ templates = Jinja2Templates(directory=os.path.join(os.path.dirname(__file__), "w
 def _is_all_scope(scope: str | None) -> bool:
     return (scope or "").lower() == "all"
 
+_SENSITIVE_ENV_KEYS = (
+    "KEY",
+    "TOKEN",
+    "SECRET",
+    "PASSWORD",
+    "PASS",
+    "AUTH",
+    "BEARER",
+    "PRIVATE",
+)
+
+_ENV_KEYS_TO_LOG = (
+    "LOG_LEVEL",
+    "FIREFLY_URL",
+    "FIREFLY_TOKEN",
+    "OPENAI_API_KEY",
+    "OPENAI_MODEL",
+    "OPENAI_BASE_URL",
+    "AUTO_APPROVE_THRESHOLD",
+    "MANUAL_TAGS",
+    "AUTO_APPROVE_TAGS",
+)
+
+def _should_mask_env_value(name: str, value: str) -> bool:
+    upper_name = name.upper()
+    if any(marker in upper_name for marker in _SENSITIVE_ENV_KEYS):
+        return True
+    if value.startswith("sk-") or value.startswith("rk-"):
+        return True
+    if value.startswith("Bearer ") or value.startswith("bearer "):
+        return True
+    if value.startswith("eyJ") and value.count(".") == 2:
+        return True
+    return False
+
+def _mask_env_value(name: str, value: str) -> str:
+    sanitized = value.replace("\r", "\\r").replace("\n", "\\n")
+    if not _should_mask_env_value(name, sanitized):
+        return sanitized
+    if len(sanitized) <= 4:
+        return "****"
+    return f"{sanitized[:2]}...{sanitized[-2:]}"
+
+def _log_environment() -> None:
+    logger.info("[ENV] Logging configured environment variables (masked where needed).")
+    for key in _ENV_KEYS_TO_LOG:
+        raw_value = os.getenv(key)
+        value = "<unset>" if raw_value is None else _mask_env_value(key, raw_value)
+        logger.info(f"[ENV] {key}={value}")
+
+def _parse_tag_list(raw_tags: str | None) -> list[str]:
+    if not raw_tags:
+        return []
+    parts = [part.strip() for part in raw_tags.split(",")]
+    tags = []
+    seen = set()
+    for part in parts:
+        if part and part not in seen:
+            tags.append(part)
+            seen.add(part)
+    return tags
+
+def _normalize_tags(value: Any) -> list[str]:
+    if not value:
+        return []
+    if isinstance(value, list):
+        tags = []
+        seen = set()
+        for item in value:
+            tag = str(item).strip()
+            if tag and tag not in seen:
+                tags.append(tag)
+                seen.add(tag)
+        return tags
+    if isinstance(value, str):
+        return _parse_tag_list(value)
+    return []
+
+def _merge_tags(existing_tags: list[str] | None, new_tags: list[str]) -> list[str]:
+    merged = []
+    seen = set()
+    for tag in existing_tags or []:
+        if tag and tag not in seen:
+            merged.append(tag)
+            seen.add(tag)
+    for tag in new_tags:
+        if tag and tag not in seen:
+            merged.append(tag)
+            seen.add(tag)
+    return merged
+
+def _get_env_tags(name: str) -> list[str]:
+    return _parse_tag_list(os.getenv(name))
+
 def _process_training_page(
     svc: CategorizerService, page_txs: list[dict[str, Any]]
 ) -> tuple[int, int]:
@@ -87,6 +181,7 @@ def _build_transactions_display(raw_txs: list[dict[str, Any]]) -> list[dict[str,
         curr = attrs.get("currency_code", "EUR")
         date_str = attrs.get("date", "")
         existing_cat = attrs.get("category_name")
+        existing_tags = _normalize_tags(attrs.get("tags") or t_data.get("attributes", {}).get("tags"))
         tx_id = t_data.get("id")
         try:
             dt = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
@@ -108,6 +203,7 @@ def _build_transactions_display(raw_txs: list[dict[str, Any]]) -> list[dict[str,
             "currency": curr,
             "prediction": None,
             "existing_category": existing_cat,
+            "existing_tags": existing_tags,
             "auto_approved": False,
             "raw_obj": tx_obj.model_dump_json() # For JS to pick up
         })
@@ -119,6 +215,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     global service, firefly
     # Initialize service on startup
     logger.info("Initializing services...")
+    _log_environment()
 
     # Check Environment Variables
     if not os.getenv("FIREFLY_URL") or not os.getenv("FIREFLY_TOKEN"):
@@ -149,6 +246,7 @@ class LearnRequest(BaseModel):
     category: Category
     transaction_id: str | None = None
     suggested_category: str | None = None  # What the model suggested
+    existing_tags: list[str] | None = None
 
 @app.post("/categorize", response_model=CategorizationResult | None)
 async def categorize_transaction(req: CategorizeRequest) -> CategorizationResult | None:
@@ -289,7 +387,13 @@ async def learn_transaction(req: LearnRequest) -> dict[str, Any]:
     # 2. Update Firefly III (if ID provided)
     firefly_update_status = "skipped"
     if firefly and req.transaction_id:
-        success = await firefly.update_transaction(req.transaction_id, req.category.name)
+        manual_tags = _get_env_tags("MANUAL_TAGS")
+        tags_payload = _merge_tags(req.existing_tags, manual_tags) if manual_tags else None
+        success = await firefly.update_transaction(
+            req.transaction_id,
+            req.category.name,
+            tags=tags_payload
+        )
         firefly_update_status = "success" if success else "failed"
 
     return {
@@ -356,6 +460,7 @@ async def categorize_stream(
             curr = attrs.get("currency_code", "EUR")
             date_str = attrs.get("date", "")
             existing_cat = attrs.get("category_name")
+            existing_tags = _normalize_tags(attrs.get("tags") or t_data.get("attributes", {}).get("tags"))
             tx_id = t_data.get("id")
 
             try:
@@ -385,7 +490,13 @@ async def categorize_stream(
                         f"[AUTO-APPROVE] Transaction {tx_id}: '{prediction.category.name}' "
                         f"(confidence: {prediction.confidence:.2f} >= {auto_approve_threshold})"
                     )
-                    success = await firefly.update_transaction(tx_id, prediction.category.name)
+                    auto_tags = _get_env_tags("AUTO_APPROVE_TAGS")
+                    tags_payload = _merge_tags(existing_tags, auto_tags) if auto_tags else None
+                    success = await firefly.update_transaction(
+                        tx_id,
+                        prediction.category.name,
+                        tags=tags_payload
+                    )
                     if success:
                         await asyncio.to_thread(service.learn, tx_obj, prediction.category)
                         existing_cat = prediction.category.name
@@ -467,6 +578,7 @@ async def get_transactions(
                 curr = attrs.get("currency_code", "EUR")
                 date_str = attrs.get("date", "")
                 existing_cat = attrs.get("category_name") # May be None or string
+                existing_tags = _normalize_tags(attrs.get("tags") or t_data.get("attributes", {}).get("tags"))
                 tx_id = t_data.get("id")
                 try:
                     dt = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
@@ -497,7 +609,13 @@ async def get_transactions(
                             f"(confidence: {prediction.confidence:.2f} >= {auto_approve_threshold})"
                         )
                         # Update Firefly
-                        success = await firefly.update_transaction(tx_id, prediction.category.name)
+                        auto_tags = _get_env_tags("AUTO_APPROVE_TAGS")
+                        tags_payload = _merge_tags(existing_tags, auto_tags) if auto_tags else None
+                        success = await firefly.update_transaction(
+                            tx_id,
+                            prediction.category.name,
+                            tags=tags_payload
+                        )
                         if success:
                             # Learn from this auto-approval
                             await asyncio.to_thread(service.learn, tx_obj, prediction.category)
@@ -513,6 +631,7 @@ async def get_transactions(
                     "currency": curr,
                     "prediction": prediction,
                     "existing_category": existing_cat,
+                    "existing_tags": existing_tags,
                     "auto_approved": auto_approved,
                     "raw_obj": tx_obj.model_dump_json() # For JS to pick up
                 })
