@@ -32,6 +32,7 @@ SSE_HEADERS = {
     "Connection": "keep-alive",
     "X-Accel-Buffering": "no",
 }
+YIELD_EVERY = 50
 
 # Global service instance
 service: CategorizerService | None = None
@@ -40,6 +41,78 @@ templates = Jinja2Templates(directory=os.path.join(os.path.dirname(__file__), "w
 
 def _is_all_scope(scope: str | None) -> bool:
     return (scope or "").lower() == "all"
+
+def _process_training_page(
+    svc: CategorizerService, page_txs: list[dict[str, Any]]
+) -> tuple[int, int]:
+    trained_count = 0
+    skipped_count = 0
+
+    for t_data in page_txs:
+        attrs = t_data.get("attributes", {}).get("transactions", [{}])[0]
+        desc = attrs.get("description", "")
+        amount = float(attrs.get("amount", 0.0))
+        curr = attrs.get("currency_code", "EUR")
+        date_str = attrs.get("date", "")
+        category_name = attrs.get("category_name")
+
+        # Skip uncategorized transactions
+        if not category_name:
+            skipped_count += 1
+            continue
+
+        try:
+            dt = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
+        except ValueError:
+            dt = datetime.now()
+
+        tx_obj = Transaction(
+            description=desc,
+            amount=amount,
+            date=dt,
+            currency=curr
+        )
+
+        svc.learn(tx_obj, Category(name=category_name))
+        trained_count += 1
+
+    return trained_count, skipped_count
+
+def _build_transactions_display(raw_txs: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    transactions_display = []
+    for t_data in raw_txs:
+        attrs = t_data.get("attributes", {}).get("transactions", [{}])[0]
+        desc = attrs.get("description", "")
+        amount = float(attrs.get("amount", 0.0))
+        curr = attrs.get("currency_code", "EUR")
+        date_str = attrs.get("date", "")
+        existing_cat = attrs.get("category_name")
+        tx_id = t_data.get("id")
+        try:
+            dt = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
+        except ValueError:
+            dt = datetime.now()
+
+        tx_obj = Transaction(
+            description=desc,
+            amount=amount,
+            date=dt,
+            currency=curr
+        )
+
+        transactions_display.append({
+            "id": tx_id,
+            "date_formatted": dt.strftime("%Y-%m-%d"),
+            "description": desc,
+            "amount": amount,
+            "currency": curr,
+            "prediction": None,
+            "existing_category": existing_cat,
+            "auto_approved": False,
+            "raw_obj": tx_obj.model_dump_json() # For JS to pick up
+        })
+
+    return transactions_display
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
@@ -117,34 +190,11 @@ async def train_models() -> dict[str, Any]:
     async for page_txs, _ in firefly.yield_transactions():
         total_fetched += len(page_txs)
 
-        for t_data in page_txs:
-            attrs = t_data.get("attributes", {}).get("transactions", [{}])[0]
-            desc = attrs.get("description", "")
-            amount = float(attrs.get("amount", 0.0))
-            curr = attrs.get("currency_code", "EUR")
-            date_str = attrs.get("date", "")
-            category_name = attrs.get("category_name")
-
-            # Skip uncategorized transactions
-            if not category_name:
-                skipped_count += 1
-                continue
-
-            try:
-                dt = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
-            except ValueError:
-                dt = datetime.now()
-
-            tx_obj = Transaction(
-                description=desc,
-                amount=amount,
-                date=dt,
-                currency=curr
-            )
-
-            # Train the models
-            service.learn(tx_obj, Category(name=category_name))
-            trained_count += 1
+        page_trained, page_skipped = await asyncio.to_thread(
+            _process_training_page, service, page_txs
+        )
+        trained_count += page_trained
+        skipped_count += page_skipped
 
         logger.info(f"[TRAIN] Processed page. Total trained so far: {trained_count}")
 
@@ -183,33 +233,11 @@ async def train_stream() -> StreamingResponse:
 
             total_fetched += len(page_txs)
 
-            # Process this page
-            for t_data in page_txs:
-                attrs = t_data.get("attributes", {}).get("transactions", [{}])[0]
-                desc = attrs.get("description", "")
-                amount = float(attrs.get("amount", 0.0))
-                curr = attrs.get("currency_code", "EUR")
-                date_str = attrs.get("date", "")
-                category_name = attrs.get("category_name")
-
-                if not category_name:
-                    skipped_count += 1
-                    continue
-
-                try:
-                    dt = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
-                except ValueError:
-                    dt = datetime.now()
-
-                tx_obj = Transaction(
-                    description=desc,
-                    amount=amount,
-                    date=dt,
-                    currency=curr
-                )
-
-                service.learn(tx_obj, Category(name=category_name))
-                trained_count += 1
+            page_trained, page_skipped = await asyncio.to_thread(
+                _process_training_page, service, page_txs
+            )
+            trained_count += page_trained
+            skipped_count += page_skipped
 
             # Yield progress after each page
             percent = round(total_fetched / total_estimate * 100, 1) if total_estimate > 0 else 0
@@ -318,7 +346,10 @@ async def categorize_stream(
 
         auto_approve_threshold = float(os.getenv("AUTO_APPROVE_THRESHOLD", "0"))
 
-        for t_data in raw_txs:
+        for idx, t_data in enumerate(raw_txs):
+            if idx % YIELD_EVERY == 0:
+                await asyncio.sleep(0)
+
             attrs = t_data.get("attributes", {}).get("transactions", [{}])[0]
             desc = attrs.get("description", "")
             amount = float(attrs.get("amount", 0.0))
@@ -350,16 +381,16 @@ async def categorize_stream(
                 )
 
                 if prediction and auto_approve_threshold > 0 and prediction.confidence >= auto_approve_threshold:
-                     logger.info(
+                    logger.info(
                         f"[AUTO-APPROVE] Transaction {tx_id}: '{prediction.category.name}' "
                         f"(confidence: {prediction.confidence:.2f} >= {auto_approve_threshold})"
                     )
-                     success = await firefly.update_transaction(tx_id, prediction.category.name)
-                     if success:
-                         service.learn(tx_obj, prediction.category)
-                         existing_cat = prediction.category.name
-                         auto_approved = True
-                         prediction = None
+                    success = await firefly.update_transaction(tx_id, prediction.category.name)
+                    if success:
+                        await asyncio.to_thread(service.learn, tx_obj, prediction.category)
+                        existing_cat = prediction.category.name
+                        auto_approved = True
+                        prediction = None
 
             payload = {
                 "id": tx_id,
@@ -420,61 +451,71 @@ async def get_transactions(
         raw_txs = result.get("data", [])
         pagination = result.get("meta", {})
 
-        # Get auto-approve threshold from env (0 = disabled)
-        auto_approve_threshold = float(os.getenv("AUTO_APPROVE_THRESHOLD", "0"))
+        if not predict:
+            transactions_display = await asyncio.to_thread(_build_transactions_display, raw_txs)
+        else:
+            # Get auto-approve threshold from env (0 = disabled)
+            auto_approve_threshold = float(os.getenv("AUTO_APPROVE_THRESHOLD", "0"))
 
-        for t_data in raw_txs:
-            attrs = t_data.get("attributes", {}).get("transactions", [{}])[0]
-            desc = attrs.get("description", "")
-            amount = float(attrs.get("amount", 0.0))
-            curr = attrs.get("currency_code", "EUR")
-            date_str = attrs.get("date", "")
-            existing_cat = attrs.get("category_name") # May be None or string
-            tx_id = t_data.get("id")
-            try:
-                dt = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
-            except ValueError:
-                dt = datetime.now() # Fallback
+            for idx, t_data in enumerate(raw_txs):
+                if idx % YIELD_EVERY == 0:
+                    await asyncio.sleep(0)
 
-            tx_obj = Transaction(
-                description=desc,
-                amount=amount,
-                date=dt,
-                currency=curr
-            )
+                attrs = t_data.get("attributes", {}).get("transactions", [{}])[0]
+                desc = attrs.get("description", "")
+                amount = float(attrs.get("amount", 0.0))
+                curr = attrs.get("currency_code", "EUR")
+                date_str = attrs.get("date", "")
+                existing_cat = attrs.get("category_name") # May be None or string
+                tx_id = t_data.get("id")
+                try:
+                    dt = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
+                except ValueError:
+                    dt = datetime.now() # Fallback
 
-            # Only predict if not already categorized
-            prediction = None
-            auto_approved = False
-            if predict and not existing_cat and service:
-                prediction = service.categorize(tx_obj, valid_categories=category_list if category_list else None)
+                tx_obj = Transaction(
+                    description=desc,
+                    amount=amount,
+                    date=dt,
+                    currency=curr
+                )
 
-                # Auto-approve if confidence exceeds threshold
-                if prediction and auto_approve_threshold > 0 and prediction.confidence >= auto_approve_threshold:
-                    logger.info(
-                        f"[AUTO-APPROVE] Transaction {tx_id}: '{prediction.category.name}' "
-                        f"(confidence: {prediction.confidence:.2f} >= {auto_approve_threshold})"
+                # Only predict if not already categorized
+                prediction = None
+                auto_approved = False
+                if predict and not existing_cat and service:
+                    prediction = await asyncio.to_thread(
+                        service.categorize,
+                        tx_obj,
+                        valid_categories=category_list if category_list else None
                     )
-                    # Update Firefly
-                    success = await firefly.update_transaction(tx_id, prediction.category.name)
-                    if success:
-                        # Learn from this auto-approval
-                        service.learn(tx_obj, prediction.category)
-                        existing_cat = prediction.category.name  # Mark as categorized
-                        auto_approved = True
-                        prediction = None  # Clear prediction since it's now saved
 
-            transactions_display.append({
-                "id": tx_id,
-                "date_formatted": dt.strftime("%Y-%m-%d"),
-                "description": desc,
-                "amount": amount,
-                "currency": curr,
-                "prediction": prediction,
-                "existing_category": existing_cat,
-                "auto_approved": auto_approved,
-                "raw_obj": tx_obj.model_dump_json() # For JS to pick up
-            })
+                    # Auto-approve if confidence exceeds threshold
+                    if prediction and auto_approve_threshold > 0 and prediction.confidence >= auto_approve_threshold:
+                        logger.info(
+                            f"[AUTO-APPROVE] Transaction {tx_id}: '{prediction.category.name}' "
+                            f"(confidence: {prediction.confidence:.2f} >= {auto_approve_threshold})"
+                        )
+                        # Update Firefly
+                        success = await firefly.update_transaction(tx_id, prediction.category.name)
+                        if success:
+                            # Learn from this auto-approval
+                            await asyncio.to_thread(service.learn, tx_obj, prediction.category)
+                            existing_cat = prediction.category.name  # Mark as categorized
+                            auto_approved = True
+                            prediction = None  # Clear prediction since it's now saved
+
+                transactions_display.append({
+                    "id": tx_id,
+                    "date_formatted": dt.strftime("%Y-%m-%d"),
+                    "description": desc,
+                    "amount": amount,
+                    "currency": curr,
+                    "prediction": prediction,
+                    "existing_category": existing_cat,
+                    "auto_approved": auto_approved,
+                    "raw_obj": tx_obj.model_dump_json() # For JS to pick up
+                })
 
     return {
         "transactions": transactions_display,
