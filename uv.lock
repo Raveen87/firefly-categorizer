@@ -90,7 +90,7 @@ wheels = [
 [[package]]
 name = "firefly-categorizer"
 version = "0.1.0"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "fastapi" },
     { name = "httpx" },
@@ -105,6 +105,13 @@ dependencies = [
 ]
 
 [package.optional-dependencies]
+dev = [
+    { name = "pytest" },
+    { name = "ruff" },
+    { name = "ty" },
+]
+
+[package.dev-dependencies]
 dev = [
     { name = "pytest" },
     { name = "ruff" },
@@ -128,6 +135,13 @@ requires-dist = [
     { name = "uvicorn", specifier = ">=0.23.0" },
 ]
 provides-extras = ["dev"]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "pytest", specifier = ">=7.0" },
+    { name = "ruff", specifier = ">=0.1.0" },
+    { name = "ty" },
+]
 
 [[package]]
 name = "h11"
