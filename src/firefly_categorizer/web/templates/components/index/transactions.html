@@ -1,0 +1,60 @@
+<section class="panel">
+    <div class="panel-header">
+        <div>
+            <h2 class="panel-title">Transactions</h2>
+            <p id="table-subtitle" class="panel-subtitle">Showing 0 transactions.</p>
+        </div>
+        <div id="loading-state" class="loading-state hidden">
+            <span id="loading-text">Loading...</span>
+            <div class="spinner"></div>
+        </div>
+    </div>
+
+    <div class="pagination-controls hidden">
+        <button class="page-btn prev-page-btn" onclick="changePage(-1)">Previous</button>
+
+        <div class="page-picker"></div>
+
+        <div class="text-sm text-gray-600">
+            Page <span class="current-page-display font-bold">1</span> of <span class="total-pages-display font-bold">1</span>
+            (<span class="total-items-display">0</span> transactions)
+        </div>
+
+        <button class="page-btn next-page-btn" onclick="changePage(1)">Next</button>
+    </div>
+
+    <div class="table-shell">
+        <table class="transactions-table">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Description</th>
+                    <th>Amount</th>
+                    <th>Predicted Category</th>
+                    <th>Confidence</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="transactions-body">
+                <!-- Populated by JS -->
+            </tbody>
+        </table>
+        <div id="no-data-message" class="hidden">
+            No transactions found (or still loading...).
+        </div>
+    </div>
+
+    <div class="pagination-controls hidden">
+        <button class="page-btn prev-page-btn" onclick="changePage(-1)">Previous</button>
+
+        <div class="page-picker"></div>
+
+        <div class="text-sm text-gray-600">
+            Page <span class="current-page-display font-bold">1</span> of <span class="total-pages-display font-bold">1</span>
+            (<span class="total-items-display">0</span> transactions)
+        </div>
+
+        <button class="page-btn next-page-btn" onclick="changePage(1)">Next</button>
+    </div>
+</section>
+

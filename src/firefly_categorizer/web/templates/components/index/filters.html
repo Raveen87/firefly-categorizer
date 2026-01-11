@@ -1,0 +1,64 @@
+<section class="panel">
+    <div class="panel-header">
+        <div>
+            <h2 class="panel-title">Filters</h2>
+            <p class="panel-subtitle">Pick a window or review everything. Pagination always applies.</p>
+        </div>
+        <div id="scope-indicator" class="scope-indicator">Date range</div>
+    </div>
+
+    <form id="filter-form" action="/" method="get" class="filter-form">
+        <div class="filter-grid">
+            <div class="field-group">
+                <label class="field-label">View mode</label>
+                <div class="mode-toggle">
+                    <input type="checkbox" id="scope-all-toggle" name="scope" value="all" {% if scope == "all" %}checked{% endif %}>
+                    <label class="mode-track" for="scope-all-toggle">
+                        <span class="mode-option mode-range">Date range</span>
+                        <span class="mode-option mode-all">All transactions</span>
+                        <span class="mode-thumb"></span>
+                    </label>
+                </div>
+                <p id="scope-note" class="field-hint"></p>
+            </div>
+
+            <div class="field-group" data-filter="date">
+                <label class="field-label">Start date</label>
+                <input type="date" name="start_date" id="start-date" value="{{ start_date }}">
+            </div>
+
+            <div class="field-group" data-filter="date">
+                <label class="field-label">End date</label>
+                <input type="date" name="end_date" id="end-date" value="{{ end_date }}">
+            </div>
+
+            <div class="field-group">
+                <label class="field-label">Show categorized</label>
+                <div class="toggle-row">
+                    <div class="toggle-switch tooltip" data-tooltip="Include already categorized items">
+                        <input type="checkbox" name="toggle" id="show-categorized" class="toggle-checkbox" aria-label="Include already categorized items"/>
+                        <label for="show-categorized" class="toggle-label"></label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="field-group">
+                <label class="field-label">Per page</label>
+                <select id="limit-select">
+                    <option value="10">10</option>
+                    <option value="20">20</option>
+                    <option value="50" selected>50</option>
+                    <option value="100">100</option>
+                    <option value="200">200</option>
+                    <option value="500">500</option>
+                    <option value="1000">1000</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="actions-row">
+            <button type="submit" class="btn btn-primary">Fetch</button>
+            <button type="button" id="categorize-btn" class="btn btn-secondary">Run categorization</button>
+        </div>
+    </form>
+</section>
