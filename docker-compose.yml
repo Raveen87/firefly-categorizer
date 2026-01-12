@@ -11,4 +11,7 @@ services:
     volumes:
       # Persist the Models and Memory
       - ./data:/app/data
+      # Persist logs and configuration
+      - ./logs:/app/logs
+      - ./config:/app/config
     restart: unless-stopped

@@ -37,10 +37,13 @@ ENV PATH="/app/.venv/bin:$PATH"
 ENV PYTHONPATH="/app/src"
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
+ENV DATA_DIR="/app/data"
+ENV LOG_DIR="/app/logs"
+ENV CONFIG_DIR="/app/config"
 
-# Create volume mount points for persistence (Memory/TF-IDF models) and ensure ownership
-# We create a specific directory for data to facilitate volume mounting
-RUN mkdir -p /app/data && chown appuser:appuser /app/data
+# Create volume mount points for persistence and ensure ownership
+RUN mkdir -p /app/data /app/logs /app/config \
+    && chown appuser:appuser /app/data /app/logs /app/config
 
 # Switch to non-root user
 USER appuser

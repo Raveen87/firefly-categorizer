@@ -19,8 +19,30 @@ from firefly_categorizer.logger import get_logger, get_logging_config, setup_log
 from firefly_categorizer.manager import CategorizerService
 from firefly_categorizer.models import CategorizationResult, Category, Transaction
 
+def _load_environment() -> None:
+    config_dir = os.getenv("CONFIG_DIR")
+    if config_dir:
+        dotenv_path = os.path.join(config_dir, ".env")
+        loaded = load_dotenv(dotenv_path=dotenv_path)
+        if not loaded:
+            load_dotenv()
+    else:
+        load_dotenv()
+
+def _ensure_dir(path: str | None) -> None:
+    if path and path not in {".", "./"}:
+        os.makedirs(path, exist_ok=True)
+
 # Load environment variables
-load_dotenv()
+_load_environment()
+
+DATA_DIR = os.getenv("DATA_DIR", ".")
+LOG_DIR = os.getenv("LOG_DIR")
+CONFIG_DIR = os.getenv("CONFIG_DIR")
+
+_ensure_dir(DATA_DIR)
+_ensure_dir(LOG_DIR)
+_ensure_dir(CONFIG_DIR)
 
 # Setup logging
 setup_logging()
@@ -224,7 +246,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     if not os.getenv("OPENAI_API_KEY"):
         logger.info("OPENAI_API_KEY not set. OpenAI integration will be disabled.")
 
-    service = CategorizerService(data_dir=".")
+    service = CategorizerService(data_dir=DATA_DIR)
     firefly = FireflyClient() # Will use env vars
     logger.info("Services initialized.")
     yield

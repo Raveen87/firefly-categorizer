@@ -42,7 +42,8 @@ A hybrid transaction categorization service for Firefly III.
     ```
 2.  Open `http://localhost:8000`.
 
-The `/app/data` volume is used to persist learned categories/models.
+The `/app/data` volume persists learned categories/models. `/app/logs` stores log files and
+`/app/config` is where a container-local `.env` can live if you prefer to mount one.
 
 ## Integration
 *   **Webhooks**: Configure Firefly III to send webhooks to `http://<your-ip>:8000/webhook/firefly` (JSON format).

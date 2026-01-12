@@ -40,6 +40,23 @@ class ColourizedFormatter(logging.Formatter):
 
 def get_logging_config() -> dict:
     log_level_name = os.getenv("LOG_LEVEL", "INFO").upper()
+    log_dir = os.getenv("LOG_DIR")
+    handlers = {
+        "console": {
+            "class": "logging.StreamHandler",
+            "stream": "ext://sys.stdout",
+            "formatter": "default",
+        },
+    }
+    root_handlers = ["console"]
+    if log_dir:
+        os.makedirs(log_dir, exist_ok=True)
+        handlers["file"] = {
+            "class": "logging.FileHandler",
+            "filename": os.path.join(log_dir, "app.log"),
+            "formatter": "default",
+        }
+        root_handlers.append("file")
 
     return {
         "version": 1,
@@ -50,30 +67,24 @@ def get_logging_config() -> dict:
                 "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
             },
         },
-        "handlers": {
-            "console": {
-                "class": "logging.StreamHandler",
-                "stream": "ext://sys.stdout",
-                "formatter": "default",
-            },
-        },
+        "handlers": handlers,
         "loggers": {
             "": {  # Root logger
-                "handlers": ["console"],
+                "handlers": root_handlers,
                 "level": log_level_name,
             },
             "uvicorn": {
-                "handlers": ["console"],
+                "handlers": root_handlers,
                 "level": "INFO",
                 "propagate": False
             },
             "uvicorn.error": {
-                "handlers": ["console"],
+                "handlers": root_handlers,
                 "level": "INFO",
                 "propagate": False
             },
             "uvicorn.access": {
-                "handlers": ["console"],
+                "handlers": root_handlers,
                 "level": "INFO",
                 "propagate": False
             },
