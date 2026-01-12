@@ -75,7 +75,7 @@
                         </div>
                     </div>
                     
-                    <div class="grid grid-cols-2 gap-4 mt-2">
+                    <div class="grid grid-cols-3 gap-4 mt-2">
                          <div class="bg-indigo-50 px-3 py-1 rounded text-sm flex justify-between">
                             <span class="text-gray-600">Trained</span>
                             <span class="text-indigo-700 font-bold" id="process-trained">0</span>
@@ -83,6 +83,10 @@
                         <div class="bg-gray-100 px-3 py-1 rounded text-sm flex justify-between">
                             <span class="text-gray-600" title="Non-categorized transactions.">Skipped</span>
                             <span class="text-gray-500 font-bold" id="process-skipped">0</span>
+                        </div>
+                        <div class="bg-amber-50 px-3 py-1 rounded text-sm flex justify-between">
+                            <span class="text-gray-600">Avg (last 10)</span>
+                            <span class="text-amber-700 font-bold" id="process-average">N/A</span>
                         </div>
                     </div>
                 </div>
@@ -189,6 +193,27 @@
             document.getElementById(stageId.replace('stage-', '') + '-icon').textContent = icon || '✅';
         }
 
+        function formatDuration(seconds) {
+            if (!Number.isFinite(seconds) || seconds <= 0) {
+                return '0s';
+            }
+            if (seconds < 1) {
+                const ms = Math.max(0, Math.round(seconds * 1000));
+                return `${ms}ms`;
+            }
+            const totalSeconds = Math.round(seconds);
+            const hours = Math.floor(totalSeconds / 3600);
+            const minutes = Math.floor((totalSeconds % 3600) / 60);
+            const secs = totalSeconds % 60;
+            if (hours > 0) {
+                return `${hours}h ${minutes}m ${secs}s`;
+            }
+            if (minutes > 0) {
+                return `${minutes}m ${secs}s`;
+            }
+            return `${secs}s`;
+        }
+
         async function startTraining() {
             const btn = document.getElementById('train-btn');
 
@@ -214,6 +239,7 @@
             document.getElementById('process-stats').textContent = 'Starting...';
             document.getElementById('process-trained').textContent = '0';
             document.getElementById('process-skipped').textContent = '0';
+            document.getElementById('process-average').textContent = 'N/A';
 
             // Connect to SSE endpoint
             const eventSource = new EventSource('/train-stream');
@@ -222,13 +248,22 @@
                 const data = JSON.parse(event.data);
 
                 if (data.stage === 'start') {
-                    document.getElementById('process-stats').textContent = 'Connecting...';
+                    document.getElementById('process-stats').textContent = 'Initializing...';
                 }
                 else if (data.stage === 'processing') {
-                    document.getElementById('process-stats').textContent = `${data.fetched} / ${data.total} processed (${data.percent}%)`;
+                    const remaining = (data.total || 0) - (data.fetched || 0);
+                    const avgSeconds = data.avg_last_10_seconds || 0;
+                    const etaText = remaining > 0 && avgSeconds
+                        ? formatDuration(remaining * avgSeconds)
+                        : 'N/A';
+                    document.getElementById('process-stats').textContent =
+                        `${data.fetched} / ${data.total} processed (${data.percent}%) | ETA: ${etaText}`;
                     document.getElementById('process-progress').style.width = `${data.percent}%`;
                     document.getElementById('process-trained').textContent = data.trained;
                     document.getElementById('process-skipped').textContent = data.skipped;
+                    document.getElementById('process-average').textContent = avgSeconds
+                        ? formatDuration(avgSeconds)
+                        : 'N/A';
                 }
                 else if (data.stage === 'complete') {
                     document.getElementById('process-stats').textContent = 'Done';

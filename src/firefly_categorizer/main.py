@@ -1,9 +1,11 @@
 import asyncio
 import json
 import os
+from collections import deque
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
+from time import perf_counter
 from typing import Any
 
 import uvicorn
@@ -54,7 +56,8 @@ SSE_HEADERS = {
     "Connection": "keep-alive",
     "X-Accel-Buffering": "no",
 }
-YIELD_EVERY = 50
+STREAM_YIELD_EVERY = 50
+DEFAULT_TRAINING_PAGE_SIZE = 50
 
 # Global service instance
 service: CategorizerService | None = None
@@ -83,6 +86,7 @@ _ENV_KEYS_TO_LOG = (
     "OPENAI_MODEL",
     "OPENAI_BASE_URL",
     "AUTO_APPROVE_THRESHOLD",
+    "TRAINING_PAGE_SIZE",
     "MANUAL_TAGS",
     "AUTO_APPROVE_TAGS",
 )
@@ -158,11 +162,41 @@ def _merge_tags(existing_tags: list[str] | None, new_tags: list[str]) -> list[st
 def _get_env_tags(name: str) -> list[str]:
     return _parse_tag_list(os.getenv(name))
 
+def _get_env_int(name: str, default: int, min_value: int | None = None) -> int:
+    raw = os.getenv(name)
+    if not raw:
+        return default
+    try:
+        value = int(raw)
+    except ValueError:
+        logger.warning(f"[ENV] Invalid {name}='{raw}', using default {default}.")
+        return default
+    if min_value is not None and value < min_value:
+        logger.warning(f"[ENV] {name}='{raw}' below minimum {min_value}, using default {default}.")
+        return default
+    return value
+
+TRAINING_PAGE_SIZE = _get_env_int(
+    "TRAINING_PAGE_SIZE",
+    DEFAULT_TRAINING_PAGE_SIZE,
+    min_value=1
+)
+
+def _format_duration(seconds: float) -> str:
+    if seconds <= 0:
+        return "0 ms"
+    if seconds < 1:
+        return f"{seconds * 1000:.1f} ms"
+    if seconds < 60:
+        return f"{seconds:.2f} s"
+    return f"{seconds / 60:.2f} min"
+
 def _process_training_page(
     svc: CategorizerService, page_txs: list[dict[str, Any]]
-) -> tuple[int, int]:
+) -> tuple[int, int, list[float]]:
     trained_count = 0
     skipped_count = 0
+    durations: list[float] = []
 
     for t_data in page_txs:
         attrs = t_data.get("attributes", {}).get("transactions", [{}])[0]
@@ -189,10 +223,12 @@ def _process_training_page(
             currency=curr
         )
 
+        start = perf_counter()
         svc.learn(tx_obj, Category(name=category_name))
+        durations.append(perf_counter() - start)
         trained_count += 1
 
-    return trained_count, skipped_count
+    return trained_count, skipped_count, durations
 
 def _build_transactions_display(raw_txs: list[dict[str, Any]]) -> list[dict[str, Any]]:
     transactions_display = []
@@ -307,10 +343,10 @@ async def train_models() -> dict[str, Any]:
     skipped_count = 0
     total_fetched = 0
 
-    async for page_txs, _ in firefly.yield_transactions():
+    async for page_txs, _ in firefly.yield_transactions(limit_per_page=TRAINING_PAGE_SIZE):
         total_fetched += len(page_txs)
 
-        page_trained, page_skipped = await asyncio.to_thread(
+        page_trained, page_skipped, _ = await asyncio.to_thread(
             _process_training_page, service, page_txs
         )
         trained_count += page_trained
@@ -342,22 +378,30 @@ async def train_stream() -> StreamingResponse:
         skipped_count = 0
         total_fetched = 0
         total_estimate = 0
+        last_durations: deque[float] = deque(maxlen=10)
+        avg_last_10_seconds = 0.0
 
         # Notify start
         yield f"data: {json.dumps({'stage': 'start'})}\n\n"
 
-        async for page_txs, meta in firefly.yield_transactions():
+        async for page_txs, meta in firefly.yield_transactions(limit_per_page=TRAINING_PAGE_SIZE):
             # Update total estimate from metadata
             if total_estimate == 0:
                 total_estimate = meta.get("total", 0)
 
             total_fetched += len(page_txs)
 
-            page_trained, page_skipped = await asyncio.to_thread(
+            page_trained, page_skipped, page_durations = await asyncio.to_thread(
                 _process_training_page, service, page_txs
             )
             trained_count += page_trained
             skipped_count += page_skipped
+            last_durations.extend(page_durations)
+            avg_last_10_seconds = (
+                sum(last_durations) / len(last_durations)
+                if last_durations
+                else 0.0
+            )
 
             # Yield progress after each page
             percent = round(total_fetched / total_estimate * 100, 1) if total_estimate > 0 else 0
@@ -367,7 +411,9 @@ async def train_stream() -> StreamingResponse:
                 'skipped': skipped_count,
                 'fetched': total_fetched,
                 'total': total_estimate,
-                'percent': percent
+                'percent': percent,
+                'avg_last_10_seconds': avg_last_10_seconds,
+                'avg_last_10_display': _format_duration(avg_last_10_seconds) if last_durations else None
             })}\n\n"
 
         # Stage Complete
@@ -375,7 +421,9 @@ async def train_stream() -> StreamingResponse:
             'stage': 'complete',
             'trained': trained_count,
             'skipped': skipped_count,
-            'total_fetched': total_fetched
+            'total_fetched': total_fetched,
+            'avg_last_10_seconds': avg_last_10_seconds if last_durations else 0.0,
+            'avg_last_10_display': _format_duration(avg_last_10_seconds) if last_durations else None
         })}\n\n"
 
     return StreamingResponse(generate(), media_type="text/event-stream")
@@ -473,7 +521,7 @@ async def categorize_stream(
         auto_approve_threshold = float(os.getenv("AUTO_APPROVE_THRESHOLD", "0"))
 
         for idx, t_data in enumerate(raw_txs):
-            if idx % YIELD_EVERY == 0:
+            if idx % STREAM_YIELD_EVERY == 0:
                 await asyncio.sleep(0)
 
             attrs = t_data.get("attributes", {}).get("transactions", [{}])[0]
@@ -591,7 +639,7 @@ async def get_transactions(
             auto_approve_threshold = float(os.getenv("AUTO_APPROVE_THRESHOLD", "0"))
 
             for idx, t_data in enumerate(raw_txs):
-                if idx % YIELD_EVERY == 0:
+                if idx % STREAM_YIELD_EVERY == 0:
                     await asyncio.sleep(0)
 
                 attrs = t_data.get("attributes", {}).get("transactions", [{}])[0]
