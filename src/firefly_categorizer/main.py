@@ -874,7 +874,7 @@ async def help_page(request: Request) -> HTMLResponse:
         "request": request
     })
 
-@app.get("/train-page", response_class=HTMLResponse)
+@app.get("/train", response_class=HTMLResponse)
 async def train_page(request: Request) -> HTMLResponse:
     return templates.TemplateResponse("train.html", {
         "request": request
