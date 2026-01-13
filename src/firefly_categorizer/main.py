@@ -63,6 +63,10 @@ DEFAULT_TRAINING_PAGE_SIZE = 50
 service: CategorizerService | None = None
 firefly: FireflyClient | None = None
 templates = Jinja2Templates(directory=os.path.join(os.path.dirname(__file__), "web/templates"))
+training_pause_event = asyncio.Event()
+training_active = False
+training_seen_ids: set[str] = set()
+training_status: dict[str, Any] = {"stage": "idle", "active": False}
 
 def _is_all_scope(scope: str | None) -> bool:
     return (scope or "").lower() == "all"
@@ -192,13 +196,22 @@ def _format_duration(seconds: float) -> str:
     return f"{seconds / 60:.2f} min"
 
 def _process_training_page(
-    svc: CategorizerService, page_txs: list[dict[str, Any]]
-) -> tuple[int, int, list[float]]:
+    svc: CategorizerService,
+    page_txs: list[dict[str, Any]],
+    seen_ids: set[str]
+) -> tuple[int, int, int, list[float]]:
     trained_count = 0
-    skipped_count = 0
+    skipped_uncategorized = 0
+    skipped_duplicate = 0
     durations: list[float] = []
 
     for t_data in page_txs:
+        tx_id_raw = t_data.get("id")
+        tx_id = str(tx_id_raw) if tx_id_raw is not None else None
+        if tx_id and tx_id in seen_ids:
+            skipped_duplicate += 1
+            continue
+
         attrs = t_data.get("attributes", {}).get("transactions", [{}])[0]
         desc = attrs.get("description", "")
         amount = float(attrs.get("amount", 0.0))
@@ -208,7 +221,7 @@ def _process_training_page(
 
         # Skip uncategorized transactions
         if not category_name:
-            skipped_count += 1
+            skipped_uncategorized += 1
             continue
 
         try:
@@ -227,8 +240,10 @@ def _process_training_page(
         svc.learn(tx_obj, Category(name=category_name))
         durations.append(perf_counter() - start)
         trained_count += 1
+        if tx_id:
+            seen_ids.add(tx_id)
 
-    return trained_count, skipped_count, durations
+    return trained_count, skipped_uncategorized, skipped_duplicate, durations
 
 def _build_transactions_display(raw_txs: list[dict[str, Any]]) -> list[dict[str, Any]]:
     transactions_display = []
@@ -341,20 +356,33 @@ async def train_models() -> dict[str, Any]:
 
     trained_count = 0
     skipped_count = 0
+    skipped_duplicate = 0
     total_fetched = 0
+    seen_ids = training_seen_ids
 
     async for page_txs, _ in firefly.yield_transactions(limit_per_page=TRAINING_PAGE_SIZE):
         total_fetched += len(page_txs)
 
-        page_trained, page_skipped, _ = await asyncio.to_thread(
-            _process_training_page, service, page_txs
+        page_trained, page_skipped_uncategorized, page_skipped_duplicate, _ = await asyncio.to_thread(
+            _process_training_page, service, page_txs, seen_ids
         )
         trained_count += page_trained
-        skipped_count += page_skipped
+        skipped_count += page_skipped_uncategorized
+        skipped_duplicate += page_skipped_duplicate
 
-        logger.info(f"[TRAIN] Processed page. Total trained so far: {trained_count}")
+        logger.info(
+            "[TRAIN] Page processed. Skipped (already trained): %s, "
+            "Skipped (uncategorized): %s, Total trained so far: %s",
+            page_skipped_duplicate,
+            page_skipped_uncategorized,
+            trained_count
+        )
 
-    logger.info(f"[TRAIN] Complete! Trained: {trained_count}, Skipped (no category): {skipped_count}")
+    logger.info(
+        f"[TRAIN] Complete! Trained: {trained_count}, "
+        f"Skipped (no category): {skipped_count}, "
+        f"Skipped (already trained): {skipped_duplicate}"
+    )
 
     return {
         "status": "success",
@@ -370,63 +398,161 @@ async def train_stream() -> StreamingResponse:
     SSE endpoint for training with real-time progress updates.
     """
     async def generate() -> AsyncGenerator[str, None]:
+        global training_active
         if not service or not firefly:
+            training_status.clear()
+            training_status.update({
+                "stage": "error",
+                "message": "Service not initialized",
+                "active": False
+            })
             yield f"data: {json.dumps({'stage': 'error', 'message': 'Service not initialized'})}\n\n"
             return
 
         trained_count = 0
         skipped_count = 0
+        skipped_duplicate = 0
         total_fetched = 0
         total_estimate = 0
         last_durations: deque[float] = deque(maxlen=10)
         avg_last_10_seconds = 0.0
+        pause_requested = False
+        seen_ids = training_seen_ids
 
         # Notify start
+        training_active = True
+        training_pause_event.clear()
+        training_status.clear()
+        training_status.update({
+            "stage": "start",
+            "active": True,
+            "trained": 0,
+            "skipped": 0,
+            "fetched": 0,
+            "total": 0,
+            "percent": 0,
+            "avg_last_10_seconds": 0.0,
+            "avg_last_10_display": None
+        })
         yield f"data: {json.dumps({'stage': 'start'})}\n\n"
 
-        async for page_txs, meta in firefly.yield_transactions(limit_per_page=TRAINING_PAGE_SIZE):
-            # Update total estimate from metadata
-            if total_estimate == 0:
-                total_estimate = meta.get("total", 0)
+        try:
+            async for page_txs, meta in firefly.yield_transactions(limit_per_page=TRAINING_PAGE_SIZE):
+                if training_pause_event.is_set():
+                    pause_requested = True
+                    break
+                # Update total estimate from metadata
+                if total_estimate == 0:
+                    total_estimate = meta.get("total", 0)
 
-            total_fetched += len(page_txs)
+                total_fetched += len(page_txs)
 
-            page_trained, page_skipped, page_durations = await asyncio.to_thread(
-                _process_training_page, service, page_txs
-            )
-            trained_count += page_trained
-            skipped_count += page_skipped
-            last_durations.extend(page_durations)
-            avg_last_10_seconds = (
-                sum(last_durations) / len(last_durations)
-                if last_durations
-                else 0.0
-            )
+                page_trained, page_skipped_uncategorized, page_skipped_duplicate, page_durations = await asyncio.to_thread(
+                    _process_training_page, service, page_txs, seen_ids
+                )
+                trained_count += page_trained
+                skipped_count += page_skipped_uncategorized
+                skipped_duplicate += page_skipped_duplicate
+                last_durations.extend(page_durations)
+                avg_last_10_seconds = (
+                    sum(last_durations) / len(last_durations)
+                    if last_durations
+                    else 0.0
+                )
 
-            # Yield progress after each page
-            percent = round(total_fetched / total_estimate * 100, 1) if total_estimate > 0 else 0
-            yield f"data: {json.dumps({
-                'stage': 'processing',
+                logger.info(
+                    "[TRAIN] Page processed. Skipped (already trained): %s, "
+                    "Skipped (uncategorized): %s, Total trained so far: %s",
+                    page_skipped_duplicate,
+                    page_skipped_uncategorized,
+                    trained_count
+                )
+
+                if training_pause_event.is_set():
+                    pause_requested = True
+                    break
+
+                # Yield progress after each page
+                percent = round(total_fetched / total_estimate * 100, 1) if total_estimate > 0 else 0
+                status_payload = {
+                    'stage': 'processing',
+                    'trained': trained_count,
+                    'skipped': skipped_count,
+                    'fetched': total_fetched,
+                    'total': total_estimate,
+                    'percent': percent,
+                    'avg_last_10_seconds': avg_last_10_seconds,
+                    'avg_last_10_display': _format_duration(avg_last_10_seconds) if last_durations else None
+                }
+                training_status.clear()
+                training_status.update({**status_payload, "active": True})
+                yield f"data: {json.dumps(status_payload)}\n\n"
+
+            if pause_requested:
+                percent = round(total_fetched / total_estimate * 100, 1) if total_estimate > 0 else 0
+                logger.info(
+                    "[TRAIN] Training paused. Trained: %s, Skipped (no category): %s, "
+                    "Skipped (already trained): %s",
+                    trained_count,
+                    skipped_count,
+                    skipped_duplicate
+                )
+                pause_payload = {
+                    'stage': 'paused',
+                    'trained': trained_count,
+                    'skipped': skipped_count,
+                    'total_fetched': total_fetched,
+                    'fetched': total_fetched,
+                    'total': total_estimate,
+                    'percent': percent,
+                    'avg_last_10_seconds': avg_last_10_seconds if last_durations else 0.0,
+                    'avg_last_10_display': _format_duration(avg_last_10_seconds) if last_durations else None
+                }
+                training_status.clear()
+                training_status.update({**pause_payload, "active": False})
+                yield f"data: {json.dumps(pause_payload)}\n\n"
+                return
+
+            # Stage Complete
+            complete_payload = {
+                'stage': 'complete',
                 'trained': trained_count,
                 'skipped': skipped_count,
-                'fetched': total_fetched,
-                'total': total_estimate,
-                'percent': percent,
-                'avg_last_10_seconds': avg_last_10_seconds,
+                'total_fetched': total_fetched,
+                'avg_last_10_seconds': avg_last_10_seconds if last_durations else 0.0,
                 'avg_last_10_display': _format_duration(avg_last_10_seconds) if last_durations else None
-            })}\n\n"
-
-        # Stage Complete
-        yield f"data: {json.dumps({
-            'stage': 'complete',
-            'trained': trained_count,
-            'skipped': skipped_count,
-            'total_fetched': total_fetched,
-            'avg_last_10_seconds': avg_last_10_seconds if last_durations else 0.0,
-            'avg_last_10_display': _format_duration(avg_last_10_seconds) if last_durations else None
-        })}\n\n"
+            }
+            training_status.clear()
+            training_status.update({**complete_payload, "active": False})
+            yield f"data: {json.dumps(complete_payload)}\n\n"
+        finally:
+            training_active = False
+            training_pause_event.clear()
+            training_status["active"] = False
 
     return StreamingResponse(generate(), media_type="text/event-stream")
+
+@app.post("/train-pause")
+async def pause_training() -> dict[str, str]:
+    if training_active:
+        logger.info("[TRAIN] Pause requested by user.")
+        training_pause_event.set()
+        return {"status": "pausing"}
+    return {"status": "idle"}
+
+@app.get("/train-status")
+async def get_training_status() -> dict[str, Any]:
+    status = dict(training_status)
+    status["active"] = training_active
+    return status
+
+@app.post("/train-reset")
+async def reset_training_state() -> dict[str, Any]:
+    if training_active:
+        raise HTTPException(status_code=409, detail="Training in progress")
+    cleared = len(training_seen_ids)
+    training_seen_ids.clear()
+    return {"status": "cleared", "cleared": cleared}
 
 @app.post("/clear-models")
 async def clear_models() -> dict[str, str]:
@@ -434,6 +560,9 @@ async def clear_models() -> dict[str, str]:
         raise HTTPException(status_code=500, detail="Service not initialized")
 
     service.clear_models()
+    training_seen_ids.clear()
+    training_status.clear()
+    training_status.update({"stage": "idle", "active": False})
     return {"status": "success", "message": "All models cleared"}
 
 @app.post("/learn")

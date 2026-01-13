@@ -9,6 +9,29 @@ from firefly_categorizer.logger import get_logger
 
 logger = get_logger(__name__)
 
+def _safe_timestamp(value: str | None) -> float:
+    if not value:
+        return 0.0
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00")).timestamp()
+    except ValueError:
+        return 0.0
+
+def _sort_transactions_by_created_at(transactions: list[dict[str, Any]]) -> None:
+    def sort_key(tx: dict[str, Any]) -> tuple[float, str]:
+        attrs = tx.get("attributes", {})
+        created_at = attrs.get("created_at")
+        if not created_at:
+            nested = attrs.get("transactions") or []
+            if nested:
+                created_at = nested[0].get("created_at") or nested[0].get("date")
+        if not created_at:
+            created_at = attrs.get("updated_at") or attrs.get("date")
+        tx_id = tx.get("id")
+        return (_safe_timestamp(created_at), str(tx_id) if tx_id is not None else "")
+
+    transactions.sort(key=sort_key)
+
 class FireflyClient:
     def __init__(self, base_url: str | None = None, token: str | None = None):
         self.base_url = base_url or os.getenv("FIREFLY_URL")
@@ -63,6 +86,7 @@ class FireflyClient:
         page = 1
         total_count = 0
         total_pages = 1
+        sort_supported = True
 
         async with httpx.AsyncClient(timeout=60.0) as client:
             while True:
@@ -71,17 +95,39 @@ class FireflyClient:
                         "limit": limit_per_page,
                         "page": page,
                     }
+                    if sort_supported:
+                        params["sort"] = "created_at"
+                        params["order"] = "asc"
                     response = await client.get(
                         f"{self.base_url}/api/v1/transactions",
                         headers=self.headers,
                         params=params
                     )
-                    response.raise_for_status()
+                    try:
+                        response.raise_for_status()
+                    except httpx.HTTPStatusError as exc:
+                        if sort_supported and exc.response is not None and exc.response.status_code == 400:
+                            sort_supported = False
+                            logger.warning(
+                                "[TRAIN] Firefly does not support sort=created_at. Continuing without sorting."
+                            )
+                            params.pop("sort", None)
+                            params.pop("order", None)
+                            response = await client.get(
+                                f"{self.base_url}/api/v1/transactions",
+                                headers=self.headers,
+                                params=params
+                            )
+                            response.raise_for_status()
+                        else:
+                            raise
                     data = response.json()
                     transactions = data.get("data", [])
 
                     if not transactions:
                         break
+
+                    _sort_transactions_by_created_at(transactions)
 
                     all_transactions.extend(transactions)
 
@@ -118,6 +164,7 @@ class FireflyClient:
 
         page = 1
         total_pages = 1
+        sort_supported = True
 
         async with httpx.AsyncClient(timeout=60.0) as client:
             while True:
@@ -126,17 +173,39 @@ class FireflyClient:
                         "limit": limit_per_page,
                         "page": page,
                     }
+                    if sort_supported:
+                        params["sort"] = "created_at"
+                        params["order"] = "asc"
                     response = await client.get(
                         f"{self.base_url}/api/v1/transactions",
                         headers=self.headers,
                         params=params
                     )
-                    response.raise_for_status()
+                    try:
+                        response.raise_for_status()
+                    except httpx.HTTPStatusError as exc:
+                        if sort_supported and exc.response is not None and exc.response.status_code == 400:
+                            sort_supported = False
+                            logger.warning(
+                                "[TRAIN] Firefly does not support sort=created_at. Continuing without sorting."
+                            )
+                            params.pop("sort", None)
+                            params.pop("order", None)
+                            response = await client.get(
+                                f"{self.base_url}/api/v1/transactions",
+                                headers=self.headers,
+                                params=params
+                            )
+                            response.raise_for_status()
+                        else:
+                            raise
                     data = response.json()
                     transactions = data.get("data", [])
 
                     if not transactions:
                         break
+
+                    _sort_transactions_by_created_at(transactions)
 
                     # Get pagination metadata
                     meta = data.get("meta", {}).get("pagination", {})
@@ -162,23 +231,46 @@ class FireflyClient:
         page = 1
         total_count = 0
         total_pages = 1
+        sort_supported = True
 
         async with httpx.AsyncClient(timeout=60.0) as client:
             # First request to get total count
             while True:
                 try:
                     params = {"limit": limit_per_page, "page": page}
+                    if sort_supported:
+                        params["sort"] = "created_at"
+                        params["order"] = "asc"
                     response = await client.get(
                         f"{self.base_url}/api/v1/transactions",
                         headers=self.headers,
                         params=params
                     )
-                    response.raise_for_status()
+                    try:
+                        response.raise_for_status()
+                    except httpx.HTTPStatusError as exc:
+                        if sort_supported and exc.response is not None and exc.response.status_code == 400:
+                            sort_supported = False
+                            logger.warning(
+                                "[TRAIN] Firefly does not support sort=created_at. Continuing without sorting."
+                            )
+                            params.pop("sort", None)
+                            params.pop("order", None)
+                            response = await client.get(
+                                f"{self.base_url}/api/v1/transactions",
+                                headers=self.headers,
+                                params=params
+                            )
+                            response.raise_for_status()
+                        else:
+                            raise
                     data = response.json()
                     transactions = data.get("data", [])
 
                     if not transactions:
                         break
+
+                    _sort_transactions_by_created_at(transactions)
 
                     all_transactions.extend(transactions)
 

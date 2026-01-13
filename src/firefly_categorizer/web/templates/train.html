@@ -124,16 +124,48 @@
                 </div>
             </div>
 
+            <div id="stage-paused" class="hidden mb-6">
+                <div class="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                    <span class="text-amber-700 font-medium">Training paused.</span>
+                    <span id="paused-message" class="text-amber-600 ml-2"></span>
+                </div>
+            </div>
+
             <!-- Start Button -->
-            <div class="flex items-center gap-4 mt-6">
-                <button id="train-btn" onclick="startTraining()"
-                    class="bg-indigo-600 text-white px-6 py-3 rounded-lg hover:bg-indigo-700 font-medium flex items-center gap-2">
+            <div class="flex items-center gap-4 mt-6 flex-wrap">
+                <div id="train-menu-wrapper" class="relative inline-flex">
+                    <button id="train-btn" onclick="startTraining()"
+                        class="bg-indigo-600 text-white px-6 py-3 rounded-l-lg hover:bg-indigo-700 font-medium flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd"
+                                d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z"
+                                clip-rule="evenodd" />
+                        </svg>
+                        Resume Training
+                    </button>
+                    <button id="train-menu-btn" type="button" onclick="toggleTrainMenu()" aria-haspopup="true"
+                        aria-expanded="false"
+                        class="bg-indigo-600 text-white px-3 py-3 rounded-r-lg hover:bg-indigo-700 font-medium border-l border-indigo-500">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd"
+                                d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.25a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z"
+                                clip-rule="evenodd" />
+                        </svg>
+                    </button>
+                    <div id="train-menu"
+                        class="hidden absolute right-0 top-full mt-2 w-60 bg-white border border-gray-200 rounded-lg shadow-lg z-10">
+                        <button type="button" onclick="startTraining(true)"
+                            class="w-full text-left px-4 py-3 text-sm text-gray-700 hover:bg-gray-50">
+                            Start fresh import
+                        </button>
+                    </div>
+                </div>
+                <button id="pause-btn" onclick="pauseTraining()"
+                    class="bg-amber-100 text-amber-700 px-6 py-3 rounded-lg hover:bg-amber-200 font-medium flex items-center gap-2 border border-amber-200 opacity-50 cursor-not-allowed" disabled>
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                        <path fill-rule="evenodd"
-                            d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z"
-                            clip-rule="evenodd" />
+                        <rect x="5" y="5" width="10" height="10" rx="1.5"></rect>
                     </svg>
-                    Start Training
+                    Pause Training
                 </button>
                 <button id="clear-btn" onclick="clearModels()"
                     class="bg-red-100 text-red-700 px-6 py-3 rounded-lg hover:bg-red-200 font-medium flex items-center gap-2 border border-red-200">
@@ -154,6 +186,189 @@
 
 {% block scripts %}
     <script>
+        let trainingEventSource = null;
+        let trainingStatusPoll = null;
+
+        function setTrainingButtonsLoading() {
+            const btn = document.getElementById('train-btn');
+            const menuBtn = document.getElementById('train-menu-btn');
+            if (!btn) {
+                return;
+            }
+            btn.disabled = true;
+            btn.classList.add('opacity-50', 'cursor-not-allowed');
+            if (menuBtn) {
+                menuBtn.disabled = true;
+                menuBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            }
+            btn.innerHTML = `
+                <svg class="animate-spin h-5 w-5 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Training...
+            `;
+        }
+
+        function stopTrainingStatusPoll() {
+            if (trainingStatusPoll) {
+                clearInterval(trainingStatusPoll);
+                trainingStatusPoll = null;
+            }
+        }
+
+        function startTrainingStatusPoll() {
+            if (trainingStatusPoll) {
+                return;
+            }
+            trainingStatusPoll = setInterval(async () => {
+                const status = await fetchTrainingStatus();
+                if (!status) {
+                    return;
+                }
+                applyTrainingStatus(status);
+                if (!status.active) {
+                    stopTrainingStatusPoll();
+                }
+            }, 2000);
+        }
+
+        async function fetchTrainingStatus() {
+            try {
+                const response = await fetch('/train-status', { method: 'GET' });
+                if (!response.ok) {
+                    return null;
+                }
+                return await response.json();
+            } catch (error) {
+                console.error('Training status error:', error);
+                return null;
+            }
+        }
+
+        function updateProcessingUI(data) {
+            const fetched = Number.isFinite(data.fetched)
+                ? data.fetched
+                : (Number.isFinite(data.total_fetched) ? data.total_fetched : 0);
+            const total = Number.isFinite(data.total)
+                ? data.total
+                : (Number.isFinite(data.total_fetched) ? data.total_fetched : 0);
+            const percent = Number.isFinite(data.percent)
+                ? data.percent
+                : (total > 0 ? Math.round((fetched / total) * 1000) / 10 : 0);
+            const avgSeconds = Number.isFinite(data.avg_last_10_seconds) ? data.avg_last_10_seconds : 0;
+            const remaining = total - fetched;
+            const etaText = remaining > 0 && avgSeconds
+                ? formatDuration(remaining * avgSeconds)
+                : 'N/A';
+            const statsText = total
+                ? `${fetched} / ${total} processed (${percent}%) | ETA: ${etaText}`
+                : `${fetched} processed`;
+
+            document.getElementById('process-stats').textContent = statsText;
+            document.getElementById('process-progress').style.width = `${percent}%`;
+            document.getElementById('process-trained').textContent = data.trained ?? 0;
+            document.getElementById('process-skipped').textContent = data.skipped ?? 0;
+            document.getElementById('process-average').textContent = avgSeconds
+                ? formatDuration(avgSeconds)
+                : 'N/A';
+        }
+
+        function applyTrainingStatus(data) {
+            if (!data || !data.stage || data.stage === 'idle') {
+                return;
+            }
+
+            document.getElementById('stages-container').classList.remove('hidden');
+            document.getElementById('stage-error').classList.add('hidden');
+            document.getElementById('stage-paused').classList.add('hidden');
+
+            if (data.stage === 'error') {
+                document.getElementById('stage-error').classList.remove('hidden');
+                document.getElementById('error-message').textContent = data.message || 'Training error.';
+                resetButton();
+                return;
+            }
+
+            if (data.stage === 'complete') {
+                document.getElementById('stage-processing').classList.add('hidden');
+                document.getElementById('stage-complete').classList.remove('hidden');
+                document.getElementById('result-trained').textContent = data.trained ?? 0;
+                document.getElementById('result-skipped').textContent = data.skipped ?? 0;
+                document.getElementById('result-total').textContent = data.total_fetched ?? data.fetched ?? 0;
+                document.getElementById('process-progress').style.width = '100%';
+                resetButton();
+                return;
+            }
+
+            document.getElementById('stage-processing').classList.remove('hidden');
+            document.getElementById('stage-complete').classList.add('hidden');
+
+            if (data.stage === 'start') {
+                document.getElementById('process-stats').textContent = 'Initializing...';
+                document.getElementById('process-progress').style.width = '0%';
+                document.getElementById('process-trained').textContent = '0';
+                document.getElementById('process-skipped').textContent = '0';
+                document.getElementById('process-average').textContent = 'N/A';
+            } else {
+                updateProcessingUI(data);
+            }
+
+            if (data.stage === 'paused') {
+                const pausedMessage = document.getElementById('paused-message');
+                const totalEstimate = data.total || data.total_fetched || data.fetched || 0;
+                const summary = totalEstimate
+                    ? `Paused after ${data.total_fetched ?? data.fetched ?? 0} of ${totalEstimate} processed.`
+                    : `Paused after ${data.total_fetched ?? data.fetched ?? 0} processed.`;
+                if (pausedMessage) {
+                    pausedMessage.textContent = summary;
+                }
+                document.getElementById('stage-paused').classList.remove('hidden');
+                resetButton();
+                return;
+            }
+
+            if (data.active) {
+                setTrainingButtonsLoading();
+                setPauseButtonState('active');
+            } else {
+                resetButton();
+            }
+        }
+
+        function closeTrainMenu() {
+            const menu = document.getElementById('train-menu');
+            const btn = document.getElementById('train-menu-btn');
+            if (!menu || !btn) {
+                return;
+            }
+            menu.classList.add('hidden');
+            btn.setAttribute('aria-expanded', 'false');
+        }
+
+        function toggleTrainMenu() {
+            const menu = document.getElementById('train-menu');
+            const btn = document.getElementById('train-menu-btn');
+            if (!menu || !btn || btn.disabled) {
+                return;
+            }
+            const isHidden = menu.classList.contains('hidden');
+            if (isHidden) {
+                menu.classList.remove('hidden');
+                btn.setAttribute('aria-expanded', 'true');
+            } else {
+                closeTrainMenu();
+            }
+        }
+
+        document.addEventListener('click', (event) => {
+            const wrapper = document.getElementById('train-menu-wrapper');
+            if (!wrapper || wrapper.contains(event.target)) {
+                return;
+            }
+            closeTrainMenu();
+        });
+
         async function clearModels() {
             if (!confirm("⚠️ DANGER: Are you sure you want to clear all models?\n\nThis will permanently delete all learned transaction patterns. Future categorizations will be inaccurate until you retrain the models.\n\nOnly proceed if you are testing or need to reset corrupted data.")) {
                 return;
@@ -214,25 +429,89 @@
             return `${secs}s`;
         }
 
-        async function startTraining() {
-            const btn = document.getElementById('train-btn');
-
-            // Disable button
-            btn.disabled = true;
-            btn.classList.add('opacity-50', 'cursor-not-allowed');
-            btn.innerHTML = `
-                <svg class="animate-spin h-5 w-5 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        function setPauseButtonState(state) {
+            const pauseBtn = document.getElementById('pause-btn');
+            if (!pauseBtn) {
+                return;
+            }
+            if (state === 'active') {
+                pauseBtn.disabled = false;
+                pauseBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                pauseBtn.innerHTML = `
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <rect x="5" y="5" width="10" height="10" rx="1.5"></rect>
+                    </svg>
+                    Pause Training
+                `;
+                return;
+            }
+            if (state === 'pausing') {
+                pauseBtn.disabled = true;
+                pauseBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                pauseBtn.textContent = 'Pausing...';
+                return;
+            }
+            pauseBtn.disabled = true;
+            pauseBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            pauseBtn.innerHTML = `
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <rect x="5" y="5" width="10" height="10" rx="1.5"></rect>
                 </svg>
-                Training...
+                Pause Training
             `;
+        }
+
+        async function pauseTraining() {
+            if (!trainingEventSource) {
+                return;
+            }
+            setPauseButtonState('pausing');
+            try {
+                await fetch('/train-pause', { method: 'POST' });
+            } catch (error) {
+                console.error('Pause training error:', error);
+            }
+        }
+
+        async function startTraining(startFresh = false) {
+            closeTrainMenu();
+            stopTrainingStatusPoll();
+            if (trainingEventSource) {
+                trainingEventSource.close();
+                trainingEventSource = null;
+            }
+
+            if (startFresh) {
+                const confirmReset = confirm(
+                    'Start fresh import?\n\nThis clears all learned models and resets training progress tracking. Transactions will be retrained from scratch.'
+                );
+                if (!confirmReset) {
+                    return;
+                }
+                try {
+                    const response = await fetch('/clear-models', { method: 'POST' });
+                    if (!response.ok) {
+                        const data = await response.json().catch(() => ({}));
+                        const detail = data.message || data.detail || 'Unable to clear models.';
+                        alert(detail);
+                        return;
+                    }
+                } catch (error) {
+                    console.error('Clear models error:', error);
+                    alert('Unable to clear models.');
+                    return;
+                }
+            }
+
+            setTrainingButtonsLoading();
 
             // Show stages container and reset states
             document.getElementById('stages-container').classList.remove('hidden');
             document.getElementById('stage-complete').classList.add('hidden');
             document.getElementById('stage-error').classList.add('hidden');
+            document.getElementById('stage-paused').classList.add('hidden');
             document.getElementById('stage-processing').classList.remove('hidden');
+            setPauseButtonState('active');
             
             // Reset stats
             document.getElementById('process-progress').style.width = '0%';
@@ -243,6 +522,7 @@
 
             // Connect to SSE endpoint
             const eventSource = new EventSource('/train-stream');
+            trainingEventSource = eventSource;
 
             eventSource.onmessage = function (event) {
                 const data = JSON.parse(event.data);
@@ -277,6 +557,25 @@
                     document.getElementById('result-total').textContent = data.total_fetched;
 
                     eventSource.close();
+                    trainingEventSource = null;
+                    resetButton();
+                }
+                else if (data.stage === 'paused') {
+                    const pausedMessage = document.getElementById('paused-message');
+                    const totalEstimate = data.total || data.total_fetched || 0;
+                    const summary = totalEstimate
+                        ? `Paused after ${data.total_fetched} of ${totalEstimate} processed.`
+                        : `Paused after ${data.total_fetched} processed.`;
+                    if (pausedMessage) {
+                        pausedMessage.textContent = summary;
+                    }
+                    if (typeof data.percent === 'number') {
+                        document.getElementById('process-progress').style.width = `${data.percent}%`;
+                    }
+                    document.getElementById('stage-paused').classList.remove('hidden');
+
+                    eventSource.close();
+                    trainingEventSource = null;
                     resetButton();
                 }
                 else if (data.stage === 'error') {
@@ -284,6 +583,7 @@
                     document.getElementById('error-message').textContent = data.message;
 
                     eventSource.close();
+                    trainingEventSource = null;
                     resetButton();
                 }
             };
@@ -293,20 +593,39 @@
                 document.getElementById('stage-error').classList.remove('hidden');
                 document.getElementById('error-message').textContent = 'Connection lost. Check server logs.';
                 eventSource.close();
+                trainingEventSource = null;
                 resetButton();
             };
         }
 
         function resetButton() {
             const btn = document.getElementById('train-btn');
+            const menuBtn = document.getElementById('train-menu-btn');
+            closeTrainMenu();
             btn.disabled = false;
             btn.classList.remove('opacity-50', 'cursor-not-allowed');
             btn.innerHTML = `
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                     <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd" />
                 </svg>
-                Start Training
+                Resume Training
             `;
+            if (menuBtn) {
+                menuBtn.disabled = false;
+                menuBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            }
+            setPauseButtonState('idle');
         }
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            const status = await fetchTrainingStatus();
+            if (!status) {
+                return;
+            }
+            applyTrainingStatus(status);
+            if (status.active || status.stage === 'start' || status.stage === 'processing') {
+                startTrainingStatusPoll();
+            }
+        });
     </script>
 {% endblock %}
