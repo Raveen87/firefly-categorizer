@@ -2,98 +2,508 @@
 
 {% block title %}Help - Firefly Categorizer{% endblock %}
 
+{% block head %}
+    <style>
+        .help-shell {
+            position: relative;
+            display: grid;
+            gap: 32px;
+        }
+
+        .help-shell::before {
+            content: "";
+            position: absolute;
+            top: -60px;
+            right: -40px;
+            width: 240px;
+            height: 240px;
+            background: radial-gradient(circle at top, rgba(14, 165, 233, 0.18), rgba(79, 70, 229, 0));
+            opacity: 0.85;
+            pointer-events: none;
+        }
+
+        .help-shell::after {
+            content: "";
+            position: absolute;
+            bottom: -80px;
+            left: -60px;
+            width: 220px;
+            height: 220px;
+            background: radial-gradient(circle at bottom, rgba(34, 197, 94, 0.12), rgba(34, 197, 94, 0));
+            opacity: 0.75;
+            pointer-events: none;
+        }
+
+        .help-shell > * {
+            position: relative;
+            z-index: 1;
+        }
+
+        .help-hero {
+            border: 1px solid #e2e8f0;
+            border-radius: 26px;
+            padding: 32px;
+            background: linear-gradient(135deg, #ffffff 0%, #f8fafc 45%, #eef2ff 100%);
+            box-shadow: 0 24px 60px -45px rgba(15, 23, 42, 0.8);
+            display: grid;
+            gap: 16px;
+            animation: help-reveal 0.6s ease both;
+        }
+
+        .help-hero-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 6px 14px;
+            border-radius: 999px;
+            background: rgba(79, 70, 229, 0.12);
+            color: #4338ca;
+            font-size: 0.75rem;
+            font-weight: 700;
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+        }
+
+        .help-title {
+            font-family: "Palatino Linotype", "Book Antiqua", Palatino, "Times New Roman", serif;
+            font-size: clamp(2rem, 4vw, 2.75rem);
+            font-weight: 700;
+            color: #0f172a;
+        }
+
+        .help-lead {
+            font-size: 1.05rem;
+            color: #475569;
+            max-width: 44rem;
+        }
+
+        .help-hero-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .help-chip {
+            padding: 6px 12px;
+            border-radius: 999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+        }
+
+        .help-chip-memory {
+            background: rgba(59, 130, 246, 0.14);
+            color: #1d4ed8;
+        }
+
+        .help-chip-ml {
+            background: rgba(16, 185, 129, 0.14);
+            color: #047857;
+        }
+
+        .help-chip-ai {
+            background: rgba(245, 158, 11, 0.16);
+            color: #b45309;
+        }
+
+        .help-section {
+            display: grid;
+            gap: 16px;
+            animation: help-reveal 0.6s ease both;
+        }
+
+        .help-section-heading {
+            display: grid;
+            gap: 6px;
+        }
+
+        .help-section-title-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .help-section-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 12px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(79, 70, 229, 0.12);
+            color: #4338ca;
+        }
+
+        .help-icon-brain {
+            background: rgba(59, 130, 246, 0.16);
+            color: #1d4ed8;
+        }
+
+        .help-icon-flow {
+            background: rgba(16, 185, 129, 0.14);
+            color: #047857;
+        }
+
+        .help-icon-setup {
+            background: rgba(245, 158, 11, 0.18);
+            color: #b45309;
+        }
+
+        .help-kicker {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.22em;
+            color: #6366f1;
+            font-weight: 700;
+        }
+
+        .help-section-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #1f2937;
+            font-family: "Palatino Linotype", "Book Antiqua", Palatino, "Times New Roman", serif;
+        }
+
+        .help-section-subtitle {
+            font-size: 0.95rem;
+            color: #64748b;
+        }
+
+        .help-cards {
+            display: grid;
+            gap: 16px;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        }
+
+        .brain-card {
+            --accent: #3b82f6;
+            --accent-soft: rgba(59, 130, 246, 0.12);
+            --accent-dark: #1d4ed8;
+            position: relative;
+            border: 1px solid #e2e8f0;
+            border-radius: 18px;
+            padding: 18px;
+            background: #ffffff;
+            box-shadow: 0 18px 40px -32px rgba(15, 23, 42, 0.75);
+            overflow: hidden;
+        }
+
+        .brain-card::before {
+            content: "";
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 4px;
+            height: 100%;
+            background: var(--accent);
+        }
+
+        .brain-card-memory {
+            --accent: #3b82f6;
+            --accent-soft: rgba(59, 130, 246, 0.14);
+            --accent-dark: #1d4ed8;
+        }
+
+        .brain-card-tfidf {
+            --accent: #10b981;
+            --accent-soft: rgba(16, 185, 129, 0.14);
+            --accent-dark: #047857;
+        }
+
+        .brain-card-llm {
+            --accent: #f59e0b;
+            --accent-soft: rgba(245, 158, 11, 0.16);
+            --accent-dark: #b45309;
+        }
+
+        .brain-card-header {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            align-items: flex-start;
+        }
+
+        .brain-card-title {
+            font-size: 1.05rem;
+            font-weight: 700;
+            color: #0f172a;
+        }
+
+        .brain-card-copy {
+            margin-top: 6px;
+            font-size: 0.9rem;
+            color: #475569;
+        }
+
+        .brain-card-badge {
+            align-self: flex-start;
+            padding: 6px 10px;
+            border-radius: 999px;
+            background: var(--accent-soft);
+            color: var(--accent-dark);
+            font-size: 0.65rem;
+            font-weight: 700;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            white-space: nowrap;
+        }
+
+        .help-grid {
+            display: grid;
+            gap: 16px;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        }
+
+        .help-step-card {
+            border: 1px solid #e2e8f0;
+            border-radius: 18px;
+            padding: 18px;
+            background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+            box-shadow: 0 18px 40px -32px rgba(15, 23, 42, 0.75);
+            display: grid;
+            gap: 12px;
+        }
+
+        .help-step-head {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .help-step-number {
+            width: 32px;
+            height: 32px;
+            border-radius: 999px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, rgba(79, 70, 229, 0.16), rgba(14, 165, 233, 0.14));
+            color: #4338ca;
+            font-weight: 700;
+        }
+
+        .help-step-title {
+            font-size: 1rem;
+            font-weight: 700;
+            color: #0f172a;
+        }
+
+        .help-step-body {
+            color: #475569;
+            font-size: 0.92rem;
+            display: grid;
+            gap: 8px;
+        }
+
+        .help-step-body ul {
+            list-style: disc;
+            padding-left: 18px;
+        }
+
+        .help-note {
+            font-size: 0.82rem;
+            font-style: italic;
+            color: #64748b;
+        }
+
+        .feature-grid {
+            display: grid;
+            gap: 16px;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        }
+
+        .feature-card {
+            border: 1px solid #e2e8f0;
+            border-radius: 18px;
+            padding: 18px;
+            background: #ffffff;
+            box-shadow: 0 18px 40px -32px rgba(15, 23, 42, 0.7);
+            display: grid;
+            gap: 8px;
+        }
+
+        .feature-title {
+            font-weight: 700;
+            color: #1f2937;
+        }
+
+        .feature-copy {
+            color: #475569;
+            font-size: 0.92rem;
+        }
+
+        .help-shell code {
+            background: #f1f5f9;
+            color: #b91c1c;
+            padding: 2px 6px;
+            border-radius: 6px;
+            font-size: 0.85rem;
+        }
+
+        @keyframes help-reveal {
+            from {
+                opacity: 0;
+                transform: translateY(12px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+    </style>
+{% endblock %}
+
 {% block content %}
     <div class="container mx-auto p-4">
-        <div class="max-w-4xl mx-auto space-y-12">
-            
-            <!-- Introduction -->
-            <section class="text-center">
-                <h1 class="text-3xl font-bold text-gray-800 mb-4">How it Works</h1>
-                <p class="text-lg text-gray-600">
-                    Firefly Categorizer is an intelligent companion for your Firefly III finance manager. 
+        <div class="max-w-5xl mx-auto help-shell">
+            <section class="help-hero" style="animation-delay: 0.05s;">
+                <span class="help-hero-badge">Guide</span>
+                <h1 class="help-title">How it Works</h1>
+                <p class="help-lead">
+                    Firefly Categorizer is an intelligent companion for your Firefly III finance manager.
                     It automates the tedious task of categorizing transactions using a blend of memory, machine learning, and AI.
                 </p>
+                <div class="help-hero-chips">
+                    <span class="help-chip help-chip-memory">Memory</span>
+                    <span class="help-chip help-chip-ml">Machine Learning</span>
+                    <span class="help-chip help-chip-ai">AI Assist</span>
+                </div>
             </section>
 
-            <!-- Classification Engine -->
-            <section>
-                <h3 class="text-2xl font-semibold text-gray-700 mb-6">🧠 The "Brain" (Classification Engine)</h3>
-                <p class="text-gray-600 mb-4">When a transaction arrives, it goes through a three-stage decision process:</p>
-                
-                <div class="space-y-4">
-                    <!-- Memory -->
-                    <div class="bg-white p-4 rounded shadow border-l-4 border-blue-500 flex justify-between items-start">
-                        <div>
-                            <div class="font-bold text-gray-800">Memory Matcher</div>
-                            <p class="text-gray-600 text-sm mt-1">Checks for an exact match or a very close "fuzzy" match (e.g., spelling differences) against your history. If you categorized "Netflix" before, it will recognize "Netflix.com".</p>
+            <section class="help-section" style="animation-delay: 0.1s;">
+                <div class="help-section-heading">
+                    <span class="help-kicker">Classification Engine</span>
+                    <div class="help-section-title-row">
+                        <span class="help-section-icon help-icon-brain">
+                            <svg aria-hidden="true" viewBox="0 0 24 24" class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M8 6a3 3 0 0 1 6 0v1a3 3 0 0 1 3 3v1a3 3 0 0 1-3 3v2a3 3 0 0 1-6 0v-2a3 3 0 0 1-3-3v-1a3 3 0 0 1 3-3z"></path>
+                                <path d="M9 10h6"></path>
+                                <path d="M9 14h6"></path>
+                            </svg>
+                        </span>
+                        <h2 class="help-section-title">The Brain</h2>
+                    </div>
+                    <p class="help-section-subtitle">When a transaction arrives, it goes through a three-stage decision process.</p>
+                </div>
+
+                <div class="help-cards">
+                    <article class="brain-card brain-card-memory">
+                        <div class="brain-card-header">
+                            <div>
+                                <h3 class="brain-card-title">Memory Matcher</h3>
+                                <p class="brain-card-copy">Checks for an exact match or a very close fuzzy match against your history. If you categorized "Netflix" before, it will recognize "Netflix.com".</p>
+                            </div>
+                            <span class="brain-card-badge">Fastest</span>
                         </div>
-                        <span class="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-semibold ml-4 whitespace-nowrap">Fastest</span>
-                    </div>
+                    </article>
 
-                    <!-- TF-IDF -->
-                    <div class="bg-white p-4 rounded shadow border-l-4 border-green-500 flex justify-between items-start">
-                        <div>
-                            <div class="font-bold text-gray-800">TF-IDF (Machine Learning)</div>
-                            <p class="text-gray-600 text-sm mt-1">If no exact match is found, it uses statistical analysis to compare the transaction description against all your past data to find similarities.</p>
+                    <article class="brain-card brain-card-tfidf">
+                        <div class="brain-card-header">
+                            <div>
+                                <h3 class="brain-card-title">TF-IDF (Machine Learning)</h3>
+                                <p class="brain-card-copy">If no exact match is found, it uses statistical analysis to compare the transaction description against all your past data to find similarities.</p>
+                            </div>
+                            <span class="brain-card-badge">Smart</span>
                         </div>
-                        <span class="bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-semibold ml-4 whitespace-nowrap">Smart</span>
-                    </div>
+                    </article>
 
-                    <!-- LLM -->
-                    <div class="bg-white p-4 rounded shadow border-l-4 border-yellow-500 flex justify-between items-start">
-                        <div>
-                            <div class="font-bold text-gray-800">LLM (OpenAI)</div>
-                            <p class="text-gray-600 text-sm mt-1">As a last resort (and if configured), it asks an advanced AI model to determine the category based on the description.</p>
+                    <article class="brain-card brain-card-llm">
+                        <div class="brain-card-header">
+                            <div>
+                                <h3 class="brain-card-title">LLM (OpenAI)</h3>
+                                <p class="brain-card-copy">As a last resort (and if configured), it asks an AI model to determine the category based on the description.</p>
+                            </div>
+                            <span class="brain-card-badge">Fallback</span>
                         </div>
-                        <span class="bg-yellow-100 text-yellow-800 px-2 py-1 rounded text-xs font-semibold ml-4 whitespace-nowrap">Fallback</span>
-                    </div>
+                    </article>
                 </div>
             </section>
 
-            <!-- Using the Dashboard -->
-            <section>
-                <h3 class="text-2xl font-semibold text-gray-700 mb-6">💻 Using the Dashboard</h3>
-                
-                <div class="bg-white p-6 rounded shadow mb-6">
-                    <h5 class="text-lg font-bold text-gray-800 mb-2">1. Categorize View (Home)</h5>
-                    <div class="text-gray-600 space-y-2">
-                        <p>The main page lists your recent transactions from Firefly III.</p>
-                        <ul class="list-disc list-inside ml-4 space-y-1">
-                            <li><strong>Uncategorized transactions</strong> will show a suggested category. You can accept it (Checkmark) or choose a different one from the dropdown.</li>
-                            <li><strong>Categorized transactions</strong> are shown for reference.</li>
-                        </ul>
-                        <p class="italic text-sm mt-2">When you confirm or change a category, the system "learns" immediately and updates Firefly III.</p>
+            <section class="help-section" style="animation-delay: 0.15s;">
+                <div class="help-section-heading">
+                    <span class="help-kicker">Workflow</span>
+                    <div class="help-section-title-row">
+                        <span class="help-section-icon help-icon-flow">
+                            <svg aria-hidden="true" viewBox="0 0 24 24" class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M4 6h6v6H4z"></path>
+                                <path d="M14 6h6v6h-6z"></path>
+                                <path d="M4 16h16v4H4z"></path>
+                            </svg>
+                        </span>
+                        <h2 class="help-section-title">Using the Dashboard</h2>
                     </div>
+                    <p class="help-section-subtitle">Two places you will spend time when managing categories.</p>
                 </div>
 
-                <div class="bg-white p-6 rounded shadow">
-                    <h5 class="text-lg font-bold text-gray-800 mb-2">2. Training Center</h5>
-                    <p class="text-gray-600">
-                        The "Training" page allows you to bulk-train the model using your entire history from Firefly III. 
-                        This is useful when you first set up the application or if you've made many changes directly in Firefly III.
-                    </p>
+                <div class="help-grid">
+                    <article class="help-step-card">
+                        <div class="help-step-head">
+                            <span class="help-step-number">1</span>
+                            <h3 class="help-step-title">Categorize View (Home)</h3>
+                        </div>
+                        <div class="help-step-body">
+                            <p>The main page lists your recent transactions from Firefly III.</p>
+                            <ul>
+                                <li><strong>Uncategorized transactions</strong> will show a suggested category. You can accept it (Checkmark) or choose a different one from the dropdown.</li>
+                                <li><strong>Categorized transactions</strong> are shown for reference.</li>
+                            </ul>
+                            <p class="help-note">When you confirm or change a category, the system learns immediately and updates Firefly III.</p>
+                        </div>
+                    </article>
+
+                    <article class="help-step-card">
+                        <div class="help-step-head">
+                            <span class="help-step-number">2</span>
+                            <h3 class="help-step-title">Training Center</h3>
+                        </div>
+                        <div class="help-step-body">
+                            <p>
+                                The Training page allows you to bulk-train the model using your entire history from Firefly III.
+                                This is useful when you first set up the application or if you have made many changes directly in Firefly III.
+                            </p>
+                        </div>
+                    </article>
                 </div>
             </section>
 
-            <!-- Configuration -->
-            <section>
-                <h3 class="text-2xl font-semibold text-gray-700 mb-6">⚙️ Configuration & Features</h3>
-                <div class="grid grid-cols-1 md:grid-cols-4 gap-6 bg-white p-6 rounded shadow">
-                    
-                    <div class="font-semibold text-gray-700">Auto-Approve</div>
-                    <div class="md:col-span-3 text-gray-600">
-                        You can set an <code class="bg-gray-100 px-1 py-0.5 rounded text-sm text-pink-600">AUTO_APPROVE_THRESHOLD</code> (e.g., 0.9) in your <code class="bg-gray-100 px-1 py-0.5 rounded text-sm text-pink-600">.env</code> file. 
-                        If the system is confident enough in its prediction, it will automatically update Firefly III without waiting for your confirmation.
+            <section class="help-section" style="animation-delay: 0.2s;">
+                <div class="help-section-heading">
+                    <span class="help-kicker">Setup</span>
+                    <div class="help-section-title-row">
+                        <span class="help-section-icon help-icon-setup">
+                            <svg aria-hidden="true" viewBox="0 0 24 24" class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M4 7h8"></path>
+                                <path d="M16 7h4"></path>
+                                <path d="M4 17h4"></path>
+                                <path d="M12 17h8"></path>
+                                <circle cx="14" cy="7" r="2"></circle>
+                                <circle cx="10" cy="17" r="2"></circle>
+                            </svg>
+                        </span>
+                        <h2 class="help-section-title">Configuration and Features</h2>
                     </div>
+                    <p class="help-section-subtitle">Tune automated behavior and connect real-time events.</p>
+                </div>
 
-                    <div class="font-semibold text-gray-700 border-t md:border-t-0 pt-4 md:pt-0">Webhooks</div>
-                    <div class="md:col-span-3 text-gray-600 border-t md:border-t-0 pt-4 md:pt-0">
-                        The application can listen for real-time events from Firefly III. 
-                        If you configure a webhook in Firefly to point here, new transactions can be categorized instantly as they are created.
-                    </div>
+                <div class="feature-grid">
+                    <article class="feature-card">
+                        <div class="feature-title">Auto-Approve</div>
+                        <p class="feature-copy">
+                            You can set an <code>AUTO_APPROVE_THRESHOLD</code> (e.g., 0.9) in your <code>.env</code> file.
+                            If the system is confident enough in its prediction, it will automatically update Firefly III without waiting for your confirmation.
+                        </p>
+                    </article>
+
+                    <article class="feature-card">
+                        <div class="feature-title">Webhooks</div>
+                        <p class="feature-copy">
+                            The application can listen for real-time events from Firefly III.
+                            If you configure a webhook in Firefly to point here, new transactions can be categorized instantly as they are created.
+                        </p>
+                    </article>
                 </div>
             </section>
-
         </div>
     </div>
 {% endblock %}
