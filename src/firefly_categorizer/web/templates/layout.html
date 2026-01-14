@@ -4,18 +4,98 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Firefly Categorizer{% endblock %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
+        :root {
+            --font-sans: "Space Grotesk", "Segoe UI", sans-serif;
+            --font-mono: "IBM Plex Mono", "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+            --ink: #0f172a;
+            --ink-soft: #334155;
+            --muted: #64748b;
+            --bg: #f6f8fb;
+            --bg-soft: #eef2f7;
+            --panel: rgba(255, 255, 255, 0.92);
+            --panel-strong: #ffffff;
+            --panel-soft: #f1f5f9;
+            --line: rgba(15, 23, 42, 0.12);
+            --accent: #1f9db0;
+            --accent-strong: #0f766e;
+            --accent-alt: #2563eb;
+            --accent-warn: #f59e0b;
+            --accent-danger: #ef4444;
+            --shadow: 0 18px 40px rgba(15, 23, 42, 0.14);
+            --shadow-soft: 0 12px 28px rgba(15, 23, 42, 0.12);
+        }
+
         body {
-            background: radial-gradient(circle at top, rgba(224, 231, 255, 0.45), rgba(248, 250, 252, 0.9) 42%, #f8fafc 100%);
+            background-color: var(--bg);
+            background-image:
+                radial-gradient(circle at 12% 12%, rgba(31, 157, 176, 0.16), transparent 45%),
+                radial-gradient(circle at 88% 18%, rgba(249, 115, 22, 0.12), transparent 55%),
+                repeating-linear-gradient(90deg, rgba(15, 23, 42, 0.06) 0, rgba(15, 23, 42, 0.06) 1px, transparent 1px, transparent 90px),
+                repeating-linear-gradient(0deg, rgba(15, 23, 42, 0.05) 0, rgba(15, 23, 42, 0.05) 1px, transparent 1px, transparent 90px),
+                linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%);
+            color: var(--ink);
+            font-family: var(--font-sans);
+            min-height: 100vh;
+        }
+
+        body, button, input, select, textarea {
+            font-family: var(--font-sans);
+        }
+
+        .page-shell {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 28px 16px 72px;
+        }
+
+        .text-ink {
+            color: var(--ink);
+        }
+
+        .text-ink-soft {
+            color: var(--ink-soft);
+        }
+
+        .text-muted {
+            color: var(--muted);
+        }
+
+        .text-accent {
+            color: var(--accent-strong);
+        }
+
+        .text-warn {
+            color: var(--accent-warn);
+        }
+
+        .text-danger {
+            color: var(--accent-danger);
+        }
+
+        .readout {
+            font-family: var(--font-mono);
+            font-variant-numeric: tabular-nums;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        .readout-value {
+            font-family: var(--font-mono);
+            font-variant-numeric: tabular-nums;
+            letter-spacing: 0.04em;
         }
 
         .app-nav {
             position: relative;
-            background: rgba(255, 255, 255, 0.82);
-            border-bottom: 1px solid rgba(226, 232, 240, 0.9);
+            background: rgba(255, 255, 255, 0.86);
+            border-bottom: 1px solid var(--line);
             backdrop-filter: blur(18px);
-            box-shadow: 0 18px 40px -32px rgba(15, 23, 42, 0.65);
+            box-shadow: var(--shadow-soft);
         }
 
         .app-nav::before {
@@ -24,8 +104,8 @@
             top: 0;
             left: 0;
             right: 0;
-            height: 3px;
-            background: linear-gradient(90deg, #4f46e5, #0ea5e9, #22c55e);
+            height: 2px;
+            background: linear-gradient(90deg, var(--accent), var(--accent-alt), var(--accent-warn));
         }
 
         .nav-shell {
@@ -40,7 +120,8 @@
             align-items: center;
             gap: 10px;
             font-weight: 700;
-            color: #0f172a;
+            color: var(--ink);
+            letter-spacing: 0.01em;
         }
 
         .nav-logo-mark {
@@ -50,10 +131,13 @@
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            background: linear-gradient(135deg, rgba(79, 70, 229, 0.2), rgba(14, 165, 233, 0.2));
-            color: #4338ca;
+            background: linear-gradient(135deg, rgba(31, 157, 176, 0.22), rgba(37, 99, 235, 0.2));
+            color: var(--ink);
             font-weight: 700;
-            letter-spacing: 0.08em;
+            letter-spacing: 0.12em;
+            border: 1px solid rgba(15, 23, 42, 0.08);
+            box-shadow: var(--shadow-soft);
+            font-family: var(--font-mono);
         }
 
         .nav-links {
@@ -67,28 +151,42 @@
             padding: 6px 14px;
             border-radius: 999px;
             font-weight: 600;
-            color: #475569;
-            transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+            color: var(--ink-soft);
+            border: 1px solid transparent;
+            transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, border 0.2s ease;
         }
 
         .nav-link:hover {
-            background: rgba(79, 70, 229, 0.12);
-            color: #3730a3;
+            background: rgba(31, 157, 176, 0.12);
+            border-color: rgba(31, 157, 176, 0.25);
+            color: var(--ink);
         }
 
         .nav-link-active {
-            background: linear-gradient(135deg, #4f46e5, #0ea5e9);
-            color: #ffffff;
-            box-shadow: 0 12px 24px -18px rgba(15, 23, 42, 0.7);
+            background: linear-gradient(135deg, rgba(31, 157, 176, 0.25), rgba(31, 157, 176, 0.45));
+            color: var(--ink);
+            border-color: rgba(31, 157, 176, 0.35);
+            box-shadow: 0 12px 24px rgba(15, 23, 42, 0.15);
         }
 
         .nav-link-active:hover {
-            color: #ffffff;
+            color: var(--ink);
+        }
+
+        .app-footer {
+            margin-top: 48px;
+            padding: 24px 0;
+            text-align: center;
+            color: var(--muted);
+            font-size: 0.85rem;
+            background: rgba(255, 255, 255, 0.7);
+            border-top: 1px solid var(--line);
+            backdrop-filter: blur(12px);
         }
     </style>
     {% block head %}{% endblock %}
 </head>
-<body class="text-gray-800 font-sans">
+<body class="font-sans">
 
     <!-- Navigation -->
     <nav class="app-nav">
@@ -115,7 +213,7 @@
         {% block content %}{% endblock %}
     </div>
 
-    <footer class="bg-white border-t mt-12 py-6 text-center text-gray-500 text-sm">
+    <footer class="app-footer">
         &copy; 2026 Firefly Categorizer
     </footer>
 

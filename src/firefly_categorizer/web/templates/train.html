@@ -452,12 +452,308 @@
         .training-warning p {
             margin: 0;
         }
+
+        .training-page-title {
+            font-size: 1.6rem;
+            font-weight: 700;
+            color: var(--ink);
+            letter-spacing: 0.01em;
+        }
+
+        .training-info-panel {
+            border: 1px solid var(--line);
+            background: var(--panel);
+            box-shadow: var(--shadow);
+        }
+
+        .training-info-panel::before {
+            height: 3px;
+            background: linear-gradient(90deg, var(--accent), var(--accent-alt));
+        }
+
+        .training-info-summary {
+            background: rgba(31, 157, 176, 0.1);
+        }
+
+        .training-info-summary:focus-visible {
+            outline: 2px solid rgba(31, 157, 176, 0.5);
+            outline-offset: -2px;
+        }
+
+        .training-info-summary::after {
+            border-right-color: var(--accent-strong);
+            border-bottom-color: var(--accent-strong);
+        }
+
+        .info-summary-eyebrow {
+            color: var(--accent-strong);
+            font-family: var(--font-mono);
+        }
+
+        .info-summary-title {
+            color: var(--ink);
+            font-family: var(--font-sans);
+        }
+
+        .info-summary-subtitle {
+            color: var(--muted);
+        }
+
+        .training-progress-panel {
+            border: 1px solid var(--line);
+            background: var(--panel);
+            box-shadow: var(--shadow);
+        }
+
+        .training-progress-panel::before {
+            height: 3px;
+            background: linear-gradient(90deg, var(--accent), var(--accent-alt));
+        }
+
+        .progress-eyebrow {
+            color: var(--accent-strong);
+            font-family: var(--font-mono);
+        }
+
+        .progress-title {
+            color: var(--ink);
+            font-family: var(--font-sans);
+        }
+
+        .progress-subtitle {
+            color: var(--muted);
+        }
+
+        .progress-chip {
+            background: rgba(31, 157, 176, 0.12);
+            color: var(--accent-strong);
+            font-family: var(--font-mono);
+        }
+
+        .progress-chip-success {
+            background: rgba(34, 197, 94, 0.16);
+            color: #15803d;
+        }
+
+        .progress-stage-card {
+            border: 1px solid var(--line);
+            background: var(--panel-strong);
+            box-shadow: var(--shadow-soft);
+        }
+
+        .progress-stage-active {
+            border-color: rgba(31, 157, 176, 0.4);
+            background: rgba(31, 157, 176, 0.08);
+        }
+
+        .progress-stage-success {
+            border-color: rgba(34, 197, 94, 0.4);
+            background: rgba(34, 197, 94, 0.08);
+        }
+
+        .progress-stage-error {
+            border-color: rgba(239, 68, 68, 0.4);
+            background: rgba(239, 68, 68, 0.08);
+        }
+
+        .progress-stage-paused {
+            border-color: rgba(245, 158, 11, 0.4);
+            background: rgba(245, 158, 11, 0.08);
+        }
+
+        .progress-stats {
+            background: rgba(15, 23, 42, 0.06);
+            color: var(--ink-soft);
+            font-family: var(--font-mono);
+        }
+
+        .progress-track {
+            background: var(--panel-soft);
+        }
+
+        .progress-fill {
+            background: linear-gradient(90deg, var(--accent), var(--accent-alt));
+            box-shadow: 0 0 12px rgba(31, 157, 176, 0.35);
+        }
+
+        .progress-stat {
+            border-color: var(--line);
+            background: var(--panel-strong);
+        }
+
+        .progress-stat-label {
+            color: var(--muted);
+            font-family: var(--font-mono);
+        }
+
+        .progress-stat-value {
+            font-family: var(--font-mono);
+        }
+
+        .progress-stat-indigo {
+            border-color: rgba(37, 99, 235, 0.3);
+            background: rgba(37, 99, 235, 0.08);
+        }
+
+        .progress-stat-indigo .progress-stat-value {
+            color: #1d4ed8;
+        }
+
+        .progress-stat-neutral {
+            border-color: var(--line);
+            background: var(--panel-soft);
+        }
+
+        .progress-stat-neutral .progress-stat-value {
+            color: var(--ink-soft);
+        }
+
+        .progress-stat-amber {
+            border-color: rgba(245, 158, 11, 0.35);
+            background: rgba(245, 158, 11, 0.1);
+        }
+
+        .progress-stat-amber .progress-stat-value {
+            color: #b45309;
+        }
+
+        .status-icon {
+            font-family: var(--font-mono);
+        }
+
+        .status-icon-success {
+            background: rgba(34, 197, 94, 0.16);
+            color: #15803d;
+        }
+
+        .status-icon-error {
+            background: rgba(239, 68, 68, 0.16);
+            color: #b91c1c;
+        }
+
+        .status-icon-paused {
+            background: rgba(245, 158, 11, 0.18);
+            color: #b45309;
+        }
+
+        .result-card {
+            background: var(--panel-strong);
+        }
+
+        .result-card-trained {
+            border-color: rgba(37, 99, 235, 0.3);
+            background: rgba(37, 99, 235, 0.08);
+        }
+
+        .result-card-skipped {
+            border-color: var(--line);
+            background: var(--panel-soft);
+        }
+
+        .result-card-total {
+            border-color: rgba(31, 157, 176, 0.3);
+            background: rgba(31, 157, 176, 0.08);
+        }
+
+        .result-value {
+            font-family: var(--font-mono);
+        }
+
+        .training-actions {
+            border: 1px dashed rgba(31, 157, 176, 0.25);
+            background: rgba(255, 255, 255, 0.75);
+        }
+
+        .training-action {
+            box-shadow: var(--shadow-soft);
+        }
+
+        .training-action-primary {
+            background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+            color: #ffffff;
+            border-color: rgba(31, 157, 176, 0.5);
+        }
+
+        .training-action-warning {
+            background: linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(249, 115, 22, 0.3));
+            color: #92400e;
+            border-color: rgba(245, 158, 11, 0.5);
+        }
+
+        .training-action-danger {
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.2), rgba(248, 113, 113, 0.3));
+            color: #991b1b;
+            border-color: rgba(239, 68, 68, 0.5);
+        }
+
+        .training-menu {
+            border: 1px solid var(--line);
+            box-shadow: var(--shadow-soft);
+            background: var(--panel-strong);
+        }
+
+        .training-menu-item {
+            width: 100%;
+            text-align: left;
+            padding: 12px 16px;
+            font-size: 0.85rem;
+            color: var(--ink);
+        }
+
+        .training-menu-item:hover {
+            background: rgba(31, 157, 176, 0.08);
+        }
+
+        .training-warning {
+            border-color: rgba(239, 68, 68, 0.35);
+            background: rgba(239, 68, 68, 0.08);
+            color: #7f1d1d;
+        }
+
+        .warning-icon {
+            background: rgba(239, 68, 68, 0.18);
+            color: #b91c1c;
+        }
+
+        .info-block {
+            --info-accent: var(--accent);
+            border: 1px solid var(--line);
+            border-radius: 16px;
+            padding: 16px;
+            background: var(--panel-strong);
+            box-shadow: var(--shadow-soft);
+            position: relative;
+        }
+
+        .info-block::before {
+            content: "";
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 4px;
+            background: var(--info-accent);
+            border-radius: 16px 0 0 16px;
+        }
+
+        .info-block-accent {
+            --info-accent: var(--accent);
+        }
+
+        .info-block-warn {
+            --info-accent: var(--accent-warn);
+        }
+
+        .info-block-title {
+            font-weight: 700;
+            color: var(--ink);
+        }
     </style>
 {% endblock %}
 
 {% block content %}
-    <div class="container mx-auto p-4">
-        <h1 class="text-2xl font-bold mb-6 text-gray-700">Train Models</h1>
+    <div class="page-shell">
+        <h1 class="training-page-title mb-6">Train Models</h1>
 
         <!-- Info Section -->
         <div class="mb-6">
@@ -470,25 +766,25 @@
                     </div>
                 </summary>
                 <div class="training-info-body">
-                    <p class="text-gray-600 mb-4">
+                    <p class="text-muted mb-4">
                         This feature trains the categorization models using your existing transaction history from Firefly III.
                         It fetches all transactions that already have categories assigned and uses them to teach the
                         <strong>Memory</strong> and <strong>TF-IDF</strong> classifiers.
                     </p>
 
                     <div class="grid gap-4 lg:grid-cols-2">
-                        <div class="bg-blue-50 border-l-4 border-blue-500 p-4 rounded-lg">
-                            <h3 class="font-semibold text-blue-700">How it works:</h3>
-                            <ul class="list-disc list-inside text-gray-600 mt-2 space-y-1">
+                        <div class="info-block info-block-accent">
+                            <h3 class="info-block-title text-accent">How it works:</h3>
+                            <ul class="list-disc list-inside text-muted mt-2 space-y-1">
                                 <li><strong>Memory Matcher:</strong> Stores exact transaction descriptions for instant matching</li>
                                 <li><strong>TF-IDF Classifier:</strong> Learns patterns from your categorization history using
                                     machine learning</li>
                             </ul>
                         </div>
 
-                        <div class="bg-yellow-50 border-l-4 border-yellow-500 p-4 rounded-lg">
-                            <h3 class="font-semibold text-yellow-700">When to use:</h3>
-                            <ul class="list-disc list-inside text-gray-600 mt-2 space-y-1">
+                        <div class="info-block info-block-warn">
+                            <h3 class="info-block-title text-warn">When to use:</h3>
+                            <ul class="list-disc list-inside text-muted mt-2 space-y-1">
                                 <li>First time setup - bootstrap models with your existing data</li>
                                 <li>After manually categorizing many transactions in Firefly</li>
                                 <li>After restoring from a backup or migrating to a new instance</li>
@@ -518,7 +814,7 @@
                     <div id="stage-processing" class="stage-active progress-stage-card progress-stage-active">
                         <div class="flex items-center justify-between mb-3 flex-wrap gap-3">
                             <div class="flex items-center gap-2">
-                                <span class="font-medium text-gray-700">Processing Transactions</span>
+                                <span class="font-medium text-ink">Processing Transactions</span>
                             </div>
                             <span id="process-stats" class="progress-stats">Starting...</span>
                         </div>
@@ -573,8 +869,8 @@
                     <div class="flex items-start gap-3">
                         <span class="status-icon status-icon-error">!</span>
                         <div>
-                            <div class="status-title text-red-700">Error</div>
-                            <div id="error-message" class="text-red-600 text-sm mt-1"></div>
+                            <div class="status-title text-danger">Error</div>
+                            <div id="error-message" class="text-danger text-sm mt-1"></div>
                         </div>
                     </div>
                 </div>
@@ -604,7 +900,7 @@
                         </button>
                         <button id="train-menu-btn" type="button" onclick="toggleTrainMenu()" aria-haspopup="true"
                             aria-expanded="false"
-                            class="training-action training-action-primary px-3 py-3 rounded-r-lg font-medium border-l border-indigo-500">
+                            class="training-action training-action-primary px-3 py-3 rounded-r-lg font-medium border-l">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20"
                                 fill="currentColor">
                                 <path fill-rule="evenodd"
@@ -615,7 +911,7 @@
                         <div id="train-menu"
                             class="training-menu hidden absolute right-0 top-full mt-2 w-60 z-10">
                             <button type="button" onclick="startTraining(true)"
-                                class="w-full text-left px-4 py-3 text-sm text-gray-700 hover:bg-gray-50">
+                                class="training-menu-item">
                                 Start fresh import
                             </button>
                         </div>
@@ -643,7 +939,7 @@
 
                 <div class="training-warning">
                     <p class="font-bold flex items-center gap-2">
-                        <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-red-100 text-red-700">
+                        <span class="inline-flex items-center justify-center w-6 h-6 rounded-full warning-icon">
                             <svg aria-hidden="true" viewBox="0 0 24 24" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M12 7v6"></path>
                                 <circle cx="12" cy="17" r="1.5"></circle>

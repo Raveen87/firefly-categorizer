@@ -312,7 +312,7 @@
                     const sourceLabel = sourceLabels[t.prediction.source] || t.prediction.source;
                     categoryDisplay = `<span class="prediction">${predictionName}</span> <span class="tag tag-muted" title="${t.prediction.source}">${sourceLabel}</span>`;
                 } else {
-                    categoryDisplay = `<span class="text-gray-400">Unknown</span>`;
+                    categoryDisplay = `<span class="text-muted">Unknown</span>`;
                 }
 
                 row.innerHTML = `

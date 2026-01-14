@@ -8,6 +8,8 @@
             position: relative;
             display: grid;
             gap: 32px;
+            max-width: 1100px;
+            margin: 0 auto;
         }
 
         .help-shell::before {
@@ -17,7 +19,7 @@
             right: -40px;
             width: 240px;
             height: 240px;
-            background: radial-gradient(circle at top, rgba(14, 165, 233, 0.18), rgba(79, 70, 229, 0));
+            background: radial-gradient(circle at top, rgba(31, 157, 176, 0.18), rgba(31, 157, 176, 0));
             opacity: 0.85;
             pointer-events: none;
         }
@@ -29,7 +31,7 @@
             left: -60px;
             width: 220px;
             height: 220px;
-            background: radial-gradient(circle at bottom, rgba(34, 197, 94, 0.12), rgba(34, 197, 94, 0));
+            background: radial-gradient(circle at bottom, rgba(249, 115, 22, 0.16), rgba(249, 115, 22, 0));
             opacity: 0.75;
             pointer-events: none;
         }
@@ -40,14 +42,27 @@
         }
 
         .help-hero {
-            border: 1px solid #e2e8f0;
+            border: 1px solid var(--line);
             border-radius: 26px;
             padding: 32px;
-            background: linear-gradient(135deg, #ffffff 0%, #f8fafc 45%, #eef2ff 100%);
-            box-shadow: 0 24px 60px -45px rgba(15, 23, 42, 0.8);
+            background: var(--panel);
+            box-shadow: var(--shadow);
             display: grid;
             gap: 16px;
+            position: relative;
+            overflow: hidden;
             animation: help-reveal 0.6s ease both;
+        }
+
+        .help-hero::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, var(--accent), var(--accent-alt));
+            opacity: 0.8;
         }
 
         .help-hero-badge {
@@ -56,24 +71,25 @@
             justify-content: center;
             padding: 6px 14px;
             border-radius: 999px;
-            background: rgba(79, 70, 229, 0.12);
-            color: #4338ca;
+            background: rgba(31, 157, 176, 0.12);
+            color: var(--accent-strong);
             font-size: 0.75rem;
             font-weight: 700;
             letter-spacing: 0.18em;
             text-transform: uppercase;
+            font-family: var(--font-mono);
         }
 
         .help-title {
-            font-family: "Palatino Linotype", "Book Antiqua", Palatino, "Times New Roman", serif;
+            font-family: var(--font-sans);
             font-size: clamp(2rem, 4vw, 2.75rem);
             font-weight: 700;
-            color: #0f172a;
+            color: var(--ink);
         }
 
         .help-lead {
             font-size: 1.05rem;
-            color: #475569;
+            color: var(--ink-soft);
             max-width: 44rem;
         }
 
@@ -90,20 +106,21 @@
             font-weight: 600;
             letter-spacing: 0.04em;
             text-transform: uppercase;
+            font-family: var(--font-mono);
         }
 
         .help-chip-memory {
-            background: rgba(59, 130, 246, 0.14);
-            color: #1d4ed8;
+            background: rgba(31, 157, 176, 0.16);
+            color: var(--accent-strong);
         }
 
         .help-chip-ml {
-            background: rgba(16, 185, 129, 0.14);
-            color: #047857;
+            background: rgba(37, 99, 235, 0.14);
+            color: #1d4ed8;
         }
 
         .help-chip-ai {
-            background: rgba(245, 158, 11, 0.16);
+            background: rgba(249, 115, 22, 0.18);
             color: #b45309;
         }
 
@@ -131,22 +148,22 @@
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            background: rgba(79, 70, 229, 0.12);
-            color: #4338ca;
+            background: rgba(31, 157, 176, 0.14);
+            color: var(--accent-strong);
         }
 
         .help-icon-brain {
-            background: rgba(59, 130, 246, 0.16);
-            color: #1d4ed8;
+            background: rgba(31, 157, 176, 0.16);
+            color: var(--accent-strong);
         }
 
         .help-icon-flow {
-            background: rgba(16, 185, 129, 0.14);
-            color: #047857;
+            background: rgba(37, 99, 235, 0.16);
+            color: #1d4ed8;
         }
 
         .help-icon-setup {
-            background: rgba(245, 158, 11, 0.18);
+            background: rgba(249, 115, 22, 0.18);
             color: #b45309;
         }
 
@@ -154,20 +171,21 @@
             font-size: 0.7rem;
             text-transform: uppercase;
             letter-spacing: 0.22em;
-            color: #6366f1;
+            color: var(--accent-strong);
             font-weight: 700;
+            font-family: var(--font-mono);
         }
 
         .help-section-title {
             font-size: 1.5rem;
             font-weight: 700;
-            color: #1f2937;
-            font-family: "Palatino Linotype", "Book Antiqua", Palatino, "Times New Roman", serif;
+            color: var(--ink);
+            font-family: var(--font-sans);
         }
 
         .help-section-subtitle {
             font-size: 0.95rem;
-            color: #64748b;
+            color: var(--muted);
         }
 
         .help-cards {
@@ -177,15 +195,15 @@
         }
 
         .brain-card {
-            --accent: #3b82f6;
-            --accent-soft: rgba(59, 130, 246, 0.12);
-            --accent-dark: #1d4ed8;
+            --accent: var(--accent);
+            --accent-soft: rgba(31, 157, 176, 0.12);
+            --accent-dark: var(--accent-strong);
             position: relative;
-            border: 1px solid #e2e8f0;
+            border: 1px solid var(--line);
             border-radius: 18px;
             padding: 18px;
-            background: #ffffff;
-            box-shadow: 0 18px 40px -32px rgba(15, 23, 42, 0.75);
+            background: var(--panel-strong);
+            box-shadow: var(--shadow-soft);
             overflow: hidden;
         }
 
@@ -200,20 +218,20 @@
         }
 
         .brain-card-memory {
-            --accent: #3b82f6;
-            --accent-soft: rgba(59, 130, 246, 0.14);
-            --accent-dark: #1d4ed8;
+            --accent: var(--accent);
+            --accent-soft: rgba(31, 157, 176, 0.14);
+            --accent-dark: var(--accent-strong);
         }
 
         .brain-card-tfidf {
-            --accent: #10b981;
-            --accent-soft: rgba(16, 185, 129, 0.14);
-            --accent-dark: #047857;
+            --accent: #2563eb;
+            --accent-soft: rgba(37, 99, 235, 0.14);
+            --accent-dark: #1d4ed8;
         }
 
         .brain-card-llm {
             --accent: #f59e0b;
-            --accent-soft: rgba(245, 158, 11, 0.16);
+            --accent-soft: rgba(249, 115, 22, 0.16);
             --accent-dark: #b45309;
         }
 
@@ -227,13 +245,13 @@
         .brain-card-title {
             font-size: 1.05rem;
             font-weight: 700;
-            color: #0f172a;
+            color: var(--ink);
         }
 
         .brain-card-copy {
             margin-top: 6px;
             font-size: 0.9rem;
-            color: #475569;
+            color: var(--ink-soft);
         }
 
         .brain-card-badge {
@@ -247,6 +265,7 @@
             letter-spacing: 0.12em;
             text-transform: uppercase;
             white-space: nowrap;
+            font-family: var(--font-mono);
         }
 
         .help-grid {
@@ -256,11 +275,11 @@
         }
 
         .help-step-card {
-            border: 1px solid #e2e8f0;
+            border: 1px solid var(--line);
             border-radius: 18px;
             padding: 18px;
-            background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
-            box-shadow: 0 18px 40px -32px rgba(15, 23, 42, 0.75);
+            background: var(--panel-strong);
+            box-shadow: var(--shadow-soft);
             display: grid;
             gap: 12px;
         }
@@ -278,19 +297,20 @@
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            background: linear-gradient(135deg, rgba(79, 70, 229, 0.16), rgba(14, 165, 233, 0.14));
-            color: #4338ca;
+            background: rgba(31, 157, 176, 0.18);
+            color: var(--accent-strong);
             font-weight: 700;
+            font-family: var(--font-mono);
         }
 
         .help-step-title {
             font-size: 1rem;
             font-weight: 700;
-            color: #0f172a;
+            color: var(--ink);
         }
 
         .help-step-body {
-            color: #475569;
+            color: var(--ink-soft);
             font-size: 0.92rem;
             display: grid;
             gap: 8px;
@@ -304,7 +324,7 @@
         .help-note {
             font-size: 0.82rem;
             font-style: italic;
-            color: #64748b;
+            color: var(--muted);
         }
 
         .feature-grid {
@@ -314,31 +334,32 @@
         }
 
         .feature-card {
-            border: 1px solid #e2e8f0;
+            border: 1px solid var(--line);
             border-radius: 18px;
             padding: 18px;
-            background: #ffffff;
-            box-shadow: 0 18px 40px -32px rgba(15, 23, 42, 0.7);
+            background: var(--panel-strong);
+            box-shadow: var(--shadow-soft);
             display: grid;
             gap: 8px;
         }
 
         .feature-title {
             font-weight: 700;
-            color: #1f2937;
+            color: var(--ink);
         }
 
         .feature-copy {
-            color: #475569;
+            color: var(--ink-soft);
             font-size: 0.92rem;
         }
 
         .help-shell code {
-            background: #f1f5f9;
-            color: #b91c1c;
+            background: var(--panel-soft);
+            color: #b45309;
             padding: 2px 6px;
             border-radius: 6px;
             font-size: 0.85rem;
+            font-family: var(--font-mono);
         }
 
         @keyframes help-reveal {
@@ -355,8 +376,8 @@
 {% endblock %}
 
 {% block content %}
-    <div class="container mx-auto p-4">
-        <div class="max-w-5xl mx-auto help-shell">
+    <div class="page-shell">
+        <div class="help-shell">
             <section class="help-hero" style="animation-delay: 0.05s;">
                 <span class="help-hero-badge">Guide</span>
                 <h1 class="help-title">How it Works</h1>
