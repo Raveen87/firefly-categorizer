@@ -316,6 +316,23 @@ class FireflyClient:
                 logger.error(f"Error fetching categories: {e}")
                 return []
 
+    async def get_transaction(self, transaction_id: str) -> dict[str, Any] | None:
+        if not self.base_url or not self.token:
+            return None
+
+        async with httpx.AsyncClient() as client:
+            try:
+                response = await client.get(
+                    f"{self.base_url}/api/v1/transactions/{transaction_id}",
+                    headers=self.headers
+                )
+                response.raise_for_status()
+                data = response.json()
+                return data.get("data")
+            except Exception as e:
+                logger.error(f"Error fetching transaction {transaction_id}: {e}")
+                return None
+
     async def update_transaction(
         self,
         transaction_id: str,

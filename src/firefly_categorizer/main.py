@@ -195,6 +195,88 @@ def _format_duration(seconds: float) -> str:
         return f"{seconds:.2f} s"
     return f"{seconds / 60:.2f} min"
 
+_WEBHOOK_ID_KEYS = ("transaction_id", "resource_id", "object_id", "entity_id", "id")
+
+def _iter_webhook_containers(payload: Any) -> list[dict[str, Any]]:
+    containers: list[dict[str, Any]] = []
+    if isinstance(payload, dict):
+        containers.append(payload)
+        for key in ("data", "content", "transaction", "attributes"):
+            value = payload.get(key)
+            if isinstance(value, dict):
+                containers.append(value)
+
+    for container in list(containers):
+        attrs = container.get("attributes")
+        if isinstance(attrs, dict):
+            containers.append(attrs)
+        for key in ("data", "content"):
+            nested = container.get(key)
+            if isinstance(nested, dict):
+                containers.append(nested)
+        txs = container.get("transactions")
+        if isinstance(txs, list) and txs:
+            first_tx = txs[0]
+            if isinstance(first_tx, dict):
+                containers.append(first_tx)
+
+    return containers
+
+def _extract_webhook_transaction_id(payload: dict[str, Any]) -> str | None:
+    for container in _iter_webhook_containers(payload):
+        for key in _WEBHOOK_ID_KEYS:
+            value = container.get(key)
+            if value is not None and str(value).strip():
+                return str(value)
+    return None
+
+def _extract_webhook_transaction_snapshot(payload: dict[str, Any]) -> dict[str, Any] | None:
+    for container in _iter_webhook_containers(payload):
+        if "attributes" in container or "transactions" in container:
+            return container
+        if any(key in container for key in ("description", "amount", "date", "currency_code")):
+            return container
+    return None
+
+def _parse_webhook_transaction(snapshot: dict[str, Any]) -> tuple[Transaction | None, str | None, list[str]]:
+    attrs = snapshot.get("attributes") if isinstance(snapshot.get("attributes"), dict) else snapshot
+    tx_details = attrs
+    if isinstance(attrs.get("transactions"), list) and attrs["transactions"]:
+        tx_details = attrs["transactions"][0]
+    if not isinstance(tx_details, dict):
+        return None, None, []
+
+    description = str(tx_details.get("description") or "")
+    try:
+        amount = float(tx_details.get("amount", 0.0))
+    except (TypeError, ValueError):
+        amount = 0.0
+    currency = tx_details.get("currency_code") or tx_details.get("currency") or "EUR"
+    date_raw = tx_details.get("date") or tx_details.get("created_at") or tx_details.get("updated_at")
+
+    if isinstance(date_raw, datetime):
+        date_value = date_raw
+    elif isinstance(date_raw, str):
+        try:
+            date_value = datetime.fromisoformat(date_raw.replace("Z", "+00:00"))
+        except ValueError:
+            date_value = datetime.now()
+    else:
+        date_value = datetime.now()
+
+    category_name = tx_details.get("category_name") or attrs.get("category_name")
+    tags = _normalize_tags(tx_details.get("tags") or attrs.get("tags"))
+
+    if not description:
+        return None, category_name, tags
+
+    return Transaction(
+        description=description,
+        amount=amount,
+        date=date_value,
+        currency=currency
+    ), category_name, tags
+
 def _process_training_page(
     svc: CategorizerService,
     page_txs: list[dict[str, Any]],
@@ -886,9 +968,108 @@ async def firefly_webhook(request: Request) -> dict[str, str]:
     """
     Handle Firefly III Webhook.
     """
-    data = await request.json()
-    logger.info(f"Webhook received: {data}")
-    return {"status": "received"}
+    if not service:
+        raise HTTPException(status_code=500, detail="Service not initialized")
+    if not firefly:
+        raise HTTPException(status_code=500, detail="Firefly not configured")
+
+    try:
+        payload = await request.json()
+    except Exception:
+        logger.warning("[WEBHOOK] Received invalid JSON payload.")
+        raise HTTPException(status_code=400, detail="Invalid JSON payload")
+
+    if not isinstance(payload, dict):
+        logger.warning("[WEBHOOK] Unexpected payload type: %s.", type(payload).__name__)
+        return {"status": "ignored", "reason": "unexpected payload"}
+
+    event_name = payload.get("event") or payload.get("trigger") or payload.get("type")
+    event_suffix = f" ({event_name})" if event_name else ""
+    logger.info(f"[WEBHOOK] Firefly webhook received{event_suffix}.")
+
+    tx_id = _extract_webhook_transaction_id(payload)
+    snapshot = _extract_webhook_transaction_snapshot(payload)
+    if not snapshot and tx_id:
+        snapshot = await firefly.get_transaction(tx_id)
+
+    if not snapshot:
+        logger.warning("[WEBHOOK] Missing transaction details; skipping.")
+        return {"status": "ignored", "reason": "missing transaction details"}
+
+    tx_id = tx_id or _extract_webhook_transaction_id(snapshot) or "unknown"
+    tx_obj, existing_category, existing_tags = _parse_webhook_transaction(snapshot)
+
+    if not tx_obj:
+        logger.warning("[WEBHOOK] Missing transaction fields; skipping.")
+        return {"status": "ignored", "reason": "missing transaction fields"}
+
+    if existing_category:
+        logger.info(
+            "[WEBHOOK] Transaction %s already categorized as '%s'; skipping.",
+            tx_id,
+            existing_category
+        )
+        return {"status": "ignored", "reason": "already categorized"}
+
+    raw_cats = await firefly.get_categories()
+    valid_categories = [c["attributes"]["name"] for c in raw_cats] if raw_cats else None
+
+    prediction = await asyncio.to_thread(
+        service.categorize,
+        tx_obj,
+        valid_categories=valid_categories
+    )
+
+    if not prediction:
+        logger.info("[WEBHOOK] No prediction available for transaction %s; skipping.", tx_id)
+        return {"status": "ignored", "reason": "no prediction"}
+
+    auto_approve_threshold = float(os.getenv("AUTO_APPROVE_THRESHOLD", "0"))
+    if auto_approve_threshold <= 0:
+        logger.info(
+            "[WEBHOOK] Auto-approve disabled (AUTO_APPROVE_THRESHOLD=%s). Suggested '%s'.",
+            auto_approve_threshold,
+            prediction.category.name
+        )
+        return {"status": "ignored", "reason": "auto-approve disabled"}
+
+    if prediction.confidence < auto_approve_threshold:
+        logger.info(
+            "[WEBHOOK] Confidence %.2f below threshold %.2f for transaction %s; suggested '%s'.",
+            prediction.confidence,
+            auto_approve_threshold,
+            tx_id,
+            prediction.category.name
+        )
+        return {"status": "ignored", "reason": "low confidence"}
+
+    if tx_id == "unknown":
+        logger.warning("[WEBHOOK] Missing transaction ID; cannot update Firefly.")
+        return {"status": "ignored", "reason": "missing transaction id"}
+
+    auto_tags = _get_env_tags("AUTO_APPROVE_TAGS")
+    tags_payload = _merge_tags(existing_tags, auto_tags) if auto_tags else existing_tags
+    success = await firefly.update_transaction(
+        tx_id,
+        prediction.category.name,
+        tags=tags_payload
+    )
+    if success:
+        await asyncio.to_thread(service.learn, tx_obj, prediction.category)
+        logger.info(
+            "[WEBHOOK] Auto-categorized transaction %s as '%s' (confidence %.2f).",
+            tx_id,
+            prediction.category.name,
+            prediction.confidence
+        )
+        return {"status": "updated"}
+
+    logger.warning(
+        "[WEBHOOK] Failed to update transaction %s with category '%s'.",
+        tx_id,
+        prediction.category.name
+    )
+    return {"status": "failed"}
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000, log_config=get_logging_config())

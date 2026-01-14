@@ -748,6 +748,130 @@
             font-weight: 700;
             color: var(--ink);
         }
+
+        .webhook-panel {
+            border: 1px solid var(--line);
+            border-radius: 18px;
+            background: var(--panel);
+            box-shadow: var(--shadow);
+            overflow: hidden;
+            position: relative;
+        }
+
+        .webhook-panel::before {
+            content: "";
+            display: block;
+            height: 3px;
+            background: linear-gradient(90deg, var(--accent), var(--accent-alt));
+        }
+
+        .webhook-header {
+            padding: 18px 20px 10px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .webhook-eyebrow {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.18em;
+            color: var(--accent-strong);
+            font-weight: 700;
+            font-family: var(--font-mono);
+        }
+
+        .webhook-title {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: var(--ink);
+            font-family: var(--font-sans);
+        }
+
+        .webhook-subtitle {
+            font-size: 0.9rem;
+            color: var(--muted);
+            margin-top: 4px;
+        }
+
+        .webhook-chip {
+            padding: 6px 12px;
+            border-radius: 999px;
+            background: rgba(31, 157, 176, 0.14);
+            color: var(--accent-strong);
+            font-size: 0.72rem;
+            font-weight: 700;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            font-family: var(--font-mono);
+        }
+
+        .webhook-body {
+            padding: 0 20px 20px;
+            display: grid;
+            gap: 10px;
+        }
+
+        .webhook-url-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .webhook-url {
+            flex: 1;
+            min-width: 240px;
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            background: var(--panel-soft);
+            padding: 10px 12px;
+            font-size: 0.85rem;
+            color: var(--ink);
+            font-family: var(--font-mono);
+        }
+
+        .webhook-copy {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 14px;
+            border-radius: 12px;
+            border: 1px solid rgba(31, 157, 176, 0.4);
+            background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+            color: #ffffff;
+            font-weight: 600;
+            font-size: 0.85rem;
+            box-shadow: var(--shadow-soft);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .webhook-copy:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 16px 30px -18px rgba(15, 23, 42, 0.55);
+        }
+
+        .webhook-copy:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+
+        .webhook-status {
+            font-size: 0.82rem;
+            color: var(--muted);
+            min-height: 1.2em;
+        }
+
+        .webhook-status-success {
+            color: #15803d;
+        }
+
+        .webhook-status-error {
+            color: #b91c1c;
+        }
     </style>
 {% endblock %}
 
@@ -794,6 +918,33 @@
                 </div>
             </details>
         </div>
+
+        <section class="webhook-panel mb-6">
+            <div class="webhook-header">
+                <div>
+                    <div class="webhook-eyebrow">Realtime</div>
+                    <h2 class="webhook-title">Firefly Webhook</h2>
+                    <p class="webhook-subtitle">
+                        Point Firefly III to this endpoint to auto-categorize new transactions.
+                    </p>
+                </div>
+                <span class="webhook-chip">POST</span>
+            </div>
+            <div class="webhook-body">
+                <div class="webhook-url-row">
+                    <input id="webhook-url" class="webhook-url" type="text" readonly
+                        aria-label="Firefly webhook URL" value="">
+                    <button id="webhook-copy-btn" type="button" class="webhook-copy" onclick="copyWebhookUrl()">
+                        <svg aria-hidden="true" viewBox="0 0 24 24" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="9" y="9" width="11" height="11" rx="2"></rect>
+                            <rect x="4" y="4" width="11" height="11" rx="2"></rect>
+                        </svg>
+                        Copy URL
+                    </button>
+                </div>
+                <div id="webhook-copy-status" class="webhook-status" role="status" aria-live="polite"></div>
+            </div>
+        </section>
 
         <!-- Training Controls -->
         <div class="training-progress-panel">
@@ -1389,7 +1540,68 @@
             setPauseButtonState('idle');
         }
 
+        function buildWebhookUrl() {
+            const currentUrl = new URL(window.location.href);
+            let basePath = currentUrl.pathname.replace(/\/train\/?$/, "");
+            if (basePath.endsWith("/")) {
+                basePath = basePath.slice(0, -1);
+            }
+            currentUrl.pathname = `${basePath}/webhook/firefly`;
+            currentUrl.search = "";
+            currentUrl.hash = "";
+            return currentUrl.toString();
+        }
+
+        function setWebhookStatus(message, state) {
+            const status = document.getElementById('webhook-copy-status');
+            if (!status) {
+                return;
+            }
+            status.textContent = message;
+            status.classList.remove('webhook-status-success', 'webhook-status-error');
+            if (state === 'success') {
+                status.classList.add('webhook-status-success');
+            } else if (state === 'error') {
+                status.classList.add('webhook-status-error');
+            }
+        }
+
+        function setWebhookUrl() {
+            const input = document.getElementById('webhook-url');
+            if (!input) {
+                return;
+            }
+            input.value = buildWebhookUrl();
+        }
+
+        async function copyWebhookUrl() {
+            const input = document.getElementById('webhook-url');
+            if (!input) {
+                return;
+            }
+            const value = input.value.trim();
+            if (!value) {
+                setWebhookStatus('Unable to determine webhook URL.', 'error');
+                return;
+            }
+            try {
+                if (navigator.clipboard && window.isSecureContext) {
+                    await navigator.clipboard.writeText(value);
+                } else {
+                    input.focus();
+                    input.select();
+                    document.execCommand('copy');
+                    input.setSelectionRange(0, 0);
+                }
+                setWebhookStatus('Webhook URL copied.', 'success');
+            } catch (error) {
+                console.error('Webhook copy error:', error);
+                setWebhookStatus('Copy failed. Please copy manually.', 'error');
+            }
+        }
+
         document.addEventListener('DOMContentLoaded', async () => {
+            setWebhookUrl();
             const status = await fetchTrainingStatus();
             if (!status) {
                 return;
