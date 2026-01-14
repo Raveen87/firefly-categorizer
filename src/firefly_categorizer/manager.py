@@ -1,4 +1,5 @@
 import os
+import time
 
 from firefly_categorizer.classifiers.base import Classifier
 from firefly_categorizer.classifiers.llm import LLMClassifier
@@ -47,23 +48,56 @@ class CategorizerService:
     def categorize(
         self, transaction: Transaction, valid_categories: list[str] | None = None
     ) -> CategorizationResult | None:
-        for classifier in self.classifiers:
-            classifier_name = classifier.__class__.__name__
-            logger.debug(f"Trying {classifier_name} for: '{transaction.description[:50]}...'")
+        start_total = time.perf_counter()
+        result: CategorizationResult | None = None
+        matched_classifier: str | None = None
+        error: Exception | None = None
 
-            result = classifier.classify(transaction, valid_categories=valid_categories)
+        try:
+            for classifier in self.classifiers:
+                classifier_name = classifier.__class__.__name__
+                logger.debug(f"Trying {classifier_name} for: '{transaction.description[:50]}...'")
 
-            if result:
-                logger.debug(
-                    f"{classifier_name} returned: '{result.category.name}' "
-                    f"(confidence: {result.confidence:.2f})"
+                start_classifier = time.perf_counter()
+                try:
+                    result = classifier.classify(transaction, valid_categories=valid_categories)
+                finally:
+                    duration_ms = (time.perf_counter() - start_classifier) * 1000
+                    logger.info("[CATEGORIZE] %s took %.2fms", classifier_name, duration_ms)
+
+                if result:
+                    logger.debug(
+                        f"{classifier_name} returned: '{result.category.name}' "
+                        f"(confidence: {result.confidence:.2f})"
+                    )
+                    matched_classifier = classifier_name
+                    break
+                else:
+                    logger.debug(f"{classifier_name} returned: None")
+        except Exception as exc:
+            error = exc
+            raise
+        finally:
+            total_ms = (time.perf_counter() - start_total) * 1000
+            if error:
+                logger.info(
+                    "[CATEGORIZE] total took %.2fms (failed: %s)",
+                    total_ms,
+                    type(error).__name__,
                 )
-                return result
+            elif result:
+                logger.info(
+                    "[CATEGORIZE] total took %.2fms (source=%s, category='%s')",
+                    total_ms,
+                    matched_classifier,
+                    result.category.name,
+                )
             else:
-                logger.debug(f"{classifier_name} returned: None")
+                logger.info("[CATEGORIZE] total took %.2fms (no match)", total_ms)
 
-        logger.debug(f"No classifier matched for: '{transaction.description[:50]}...'")
-        return None
+        if not result:
+            logger.debug(f"No classifier matched for: '{transaction.description[:50]}...'")
+        return result
 
     def learn(self, transaction: Transaction, category: Category) -> None:
         """
