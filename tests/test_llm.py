@@ -16,9 +16,9 @@ def mock_openai_client() -> Generator[MagicMock, None, None]:
 def test_llm_classify(mock_openai_client: MagicMock) -> None:
     # Setup mock response
     mock_instance = mock_openai_client.return_value
-    mock_completion = MagicMock()
-    mock_completion.choices[0].message.content = "Groceries"
-    mock_instance.chat.completions.create.return_value = mock_completion
+    mock_response = MagicMock()
+    mock_response.output_text = "Groceries"
+    mock_instance.responses.create.return_value = mock_response
 
     classifier = LLMClassifier(api_key="sk-fake", model="gpt-4")
     t = Transaction(description="Whole Foods", amount=100.0, date=datetime.now())
@@ -30,4 +30,4 @@ def test_llm_classify(mock_openai_client: MagicMock) -> None:
     assert res.source == "llm"
 
     # Verify call
-    mock_instance.chat.completions.create.assert_called_once()
+    mock_instance.responses.create.assert_called_once()

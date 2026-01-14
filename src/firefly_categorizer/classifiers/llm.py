@@ -36,16 +36,14 @@ class LLMClassifier(Classifier):
             Return ONLY the category name. If unsure or if it doesn't fit any valid category, return 'Uncategorized'.
             """
 
-            response = self.client.chat.completions.create(
+            response = self.client.responses.create(
                 model=self.model,
-                messages=[
-                    {"role": "system", "content": "You are a helpful financial assistant."},
-                    {"role": "user", "content": prompt}
-                ],
+                instructions="You are a helpful financial assistant.",
+                input=prompt,
                 temperature=0.0
             )
 
-            category_name = response.choices[0].message.content
+            category_name = self._extract_output_text(response)
             if category_name is None:
                 return None
             category_name = category_name.strip()
@@ -63,6 +61,32 @@ class LLMClassifier(Classifier):
         except Exception as e:
             logger.error(f"LLM Error: {e}")
             return None
+
+    @staticmethod
+    def _extract_output_text(response: object) -> str | None:
+        output_text = getattr(response, "output_text", None)
+        if output_text:
+            return output_text
+
+        output = getattr(response, "output", None)
+        if not output:
+            return None
+
+        parts: list[str] = []
+        for item in output:
+            content = getattr(item, "content", None)
+            if not content:
+                continue
+            for block in content:
+                block_type = getattr(block, "type", None)
+                if block_type in {"output_text", "text"}:
+                    text = getattr(block, "text", None)
+                    if text:
+                        parts.append(text)
+
+        if parts:
+            return "".join(parts)
+        return None
 
     def learn(self, transaction: Transaction, category: Category) -> None:
         # We don't fine-tune the LLM in this simple version.
