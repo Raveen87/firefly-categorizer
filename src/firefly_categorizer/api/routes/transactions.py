@@ -12,6 +12,7 @@ from firefly_categorizer.api.dependencies import (
 )
 from firefly_categorizer.core import settings
 from firefly_categorizer.domain.transactions import (
+    build_transaction_payload,
     build_transaction_snapshot,
     build_transactions_display,
 )
@@ -58,28 +59,11 @@ async def categorize_stream(
                 await asyncio.sleep(0)
 
             snapshot = build_transaction_snapshot(t_data)
-            prediction = None
-            auto_approved = False
-            existing_cat = snapshot.category_name
-
-            if not existing_cat:
-                prediction = await pipeline.predict(
-                    snapshot.transaction,
-                    valid_categories=category_list if category_list else None,
-                )
-
-                if prediction and snapshot.transaction_id is not None:
-                    success = await pipeline.maybe_auto_approve(
-                        snapshot.transaction_id,
-                        snapshot.transaction,
-                        prediction,
-                        snapshot.tags,
-                        threshold=auto_approve_threshold,
-                    )
-                    if success:
-                        existing_cat = prediction.category.name
-                        auto_approved = True
-                        prediction = None
+            prediction, existing_cat, auto_approved = await pipeline.predict_for_snapshot(
+                snapshot,
+                valid_categories=category_list if category_list else None,
+                auto_approve_threshold=auto_approve_threshold,
+            )
 
             payload = {
                 "id": snapshot.transaction_id,
@@ -135,41 +119,23 @@ async def get_transactions(
                     await asyncio.sleep(0)
 
                 snapshot = build_transaction_snapshot(t_data)
-                existing_cat = snapshot.category_name
                 prediction = None
                 auto_approved = False
 
-                if predict and not existing_cat and service and pipeline:
-                    prediction = await pipeline.predict(
-                        snapshot.transaction,
+                existing_cat = snapshot.category_name
+                if predict and service and pipeline:
+                    prediction, existing_cat, auto_approved = await pipeline.predict_for_snapshot(
+                        snapshot,
                         valid_categories=category_list if category_list else None,
+                        auto_approve_threshold=auto_approve_threshold,
                     )
 
-                    if prediction and snapshot.transaction_id is not None:
-                        success = await pipeline.maybe_auto_approve(
-                            snapshot.transaction_id,
-                            snapshot.transaction,
-                            prediction,
-                            snapshot.tags,
-                            threshold=auto_approve_threshold,
-                        )
-                        if success:
-                            existing_cat = prediction.category.name
-                            auto_approved = True
-                            prediction = None
-
-                transactions_display.append({
-                    "id": snapshot.transaction_id,
-                    "date_formatted": snapshot.date.strftime("%Y-%m-%d"),
-                    "description": snapshot.description,
-                    "amount": snapshot.amount,
-                    "currency": snapshot.currency,
-                    "prediction": prediction,
-                    "existing_category": existing_cat,
-                    "existing_tags": snapshot.tags,
-                    "auto_approved": auto_approved,
-                    "raw_obj": snapshot.transaction.model_dump_json(),
-                })
+                transactions_display.append(build_transaction_payload(
+                    snapshot,
+                    prediction=prediction,
+                    existing_category=existing_cat,
+                    auto_approved=auto_approved,
+                ))
 
     return {
         "transactions": transactions_display,

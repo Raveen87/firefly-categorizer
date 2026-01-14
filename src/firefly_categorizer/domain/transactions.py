@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Any
 
 from firefly_categorizer.domain.tags import normalize_tags
-from firefly_categorizer.models import Transaction
+from firefly_categorizer.models import CategorizationResult, Transaction
 
 
 @dataclass(frozen=True)
@@ -75,19 +75,34 @@ def build_transactions_display(raw_txs: list[dict[str, Any]]) -> list[dict[str, 
     transactions_display = []
     for t_data in raw_txs:
         snapshot = build_transaction_snapshot(t_data)
-        transactions_display.append({
-            "id": snapshot.transaction_id,
-            "date_formatted": snapshot.date.strftime("%Y-%m-%d"),
-            "description": snapshot.description,
-            "amount": snapshot.amount,
-            "currency": snapshot.currency,
-            "prediction": None,
-            "existing_category": snapshot.category_name,
-            "existing_tags": snapshot.tags,
-            "auto_approved": False,
-            "raw_obj": snapshot.transaction.model_dump_json(),
-        })
+        transactions_display.append(build_transaction_payload(
+            snapshot,
+            prediction=None,
+            existing_category=snapshot.category_name,
+            auto_approved=False,
+        ))
     return transactions_display
+
+
+def build_transaction_payload(
+    snapshot: TransactionSnapshot,
+    *,
+    prediction: CategorizationResult | None,
+    existing_category: str | None,
+    auto_approved: bool,
+) -> dict[str, Any]:
+    return {
+        "id": snapshot.transaction_id,
+        "date_formatted": snapshot.date.strftime("%Y-%m-%d"),
+        "description": snapshot.description,
+        "amount": snapshot.amount,
+        "currency": snapshot.currency,
+        "prediction": prediction,
+        "existing_category": existing_category,
+        "existing_tags": snapshot.tags,
+        "auto_approved": auto_approved,
+        "raw_obj": snapshot.transaction.model_dump_json(),
+    }
 
 
 _WEBHOOK_ID_KEYS = ("transaction_id", "resource_id", "object_id", "entity_id", "id")

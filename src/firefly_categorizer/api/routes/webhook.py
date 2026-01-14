@@ -79,22 +79,16 @@ async def firefly_webhook(
         return {"status": "ignored", "reason": "no prediction"}
 
     auto_approve_threshold = settings.get_env_float("AUTO_APPROVE_THRESHOLD", 0.0)
-    if auto_approve_threshold <= 0:
-        logger.info(
-            "[WEBHOOK] Auto-approve disabled (AUTO_APPROVE_THRESHOLD=%s). Suggested '%s'.",
-            auto_approve_threshold,
-            prediction.category.name,
-        )
+    reason, threshold_value = pipeline.auto_approval_reason(
+        tx_id,
+        prediction,
+        threshold=auto_approve_threshold,
+        log_disabled=True,
+        log_low_confidence=True,
+    )
+    if reason == "disabled":
         return {"status": "ignored", "reason": "auto-approve disabled"}
-
-    if prediction.confidence < auto_approve_threshold:
-        logger.info(
-            "[WEBHOOK] Confidence %.2f below threshold %.2f for transaction %s; suggested '%s'.",
-            prediction.confidence,
-            auto_approve_threshold,
-            tx_id,
-            prediction.category.name,
-        )
+    if reason == "low_confidence":
         return {"status": "ignored", "reason": "low confidence"}
 
     if tx_id == "unknown":
@@ -108,7 +102,7 @@ async def firefly_webhook(
         existing_tags,
         include_existing_when_no_auto=True,
         log_auto_approve=False,
-        threshold=auto_approve_threshold,
+        threshold=threshold_value,
     )
 
     if success:

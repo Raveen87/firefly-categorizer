@@ -2,11 +2,16 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends
 
-from firefly_categorizer.api.dependencies import get_firefly_optional, get_service
+from firefly_categorizer.api.dependencies import (
+    get_firefly_optional,
+    get_pipeline,
+    get_service,
+)
 from firefly_categorizer.api.schemas import CategorizeRequest
 from firefly_categorizer.integration.firefly import FireflyClient
 from firefly_categorizer.manager import CategorizerService
 from firefly_categorizer.models import CategorizationResult
+from firefly_categorizer.services.categorization import CategorizationPipeline
 from firefly_categorizer.services.firefly_data import fetch_category_names
 
 router = APIRouter()
@@ -16,6 +21,7 @@ router = APIRouter()
 async def categorize_transaction(
     req: CategorizeRequest,
     service: Annotated[CategorizerService, Depends(get_service)],
+    pipeline: Annotated[CategorizationPipeline, Depends(get_pipeline)],
     firefly: Annotated[FireflyClient | None, Depends(get_firefly_optional)],
 ) -> CategorizationResult | None:
     valid_cats = None
@@ -24,7 +30,7 @@ async def categorize_transaction(
         if categories:
             valid_cats = categories
 
-    return service.categorize(req.transaction, valid_categories=valid_cats)
+    return await pipeline.predict(req.transaction, valid_categories=valid_cats)
 
 
 @router.get("/categories")

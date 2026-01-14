@@ -2,6 +2,7 @@ import asyncio
 
 from firefly_categorizer.core import settings
 from firefly_categorizer.domain.tags import merge_tags
+from firefly_categorizer.domain.transactions import TransactionSnapshot
 from firefly_categorizer.integration.firefly import FireflyClient
 from firefly_categorizer.logger import get_logger
 from firefly_categorizer.manager import CategorizerService
@@ -44,6 +45,28 @@ class CategorizationPipeline:
         log_low_confidence: bool = False,
         threshold: float | None = None,
     ) -> bool:
+        success, _ = await self.evaluate_auto_approval(
+            transaction_id,
+            transaction,
+            prediction,
+            existing_tags,
+            include_existing_when_no_auto=include_existing_when_no_auto,
+            log_auto_approve=log_auto_approve,
+            log_disabled=log_disabled,
+            log_low_confidence=log_low_confidence,
+            threshold=threshold,
+        )
+        return success
+
+    def auto_approval_reason(
+        self,
+        transaction_id: str | int,
+        prediction: CategorizationResult,
+        *,
+        threshold: float | None = None,
+        log_disabled: bool = False,
+        log_low_confidence: bool = False,
+    ) -> tuple[str | None, float]:
         if threshold is None:
             threshold = settings.get_env_float("AUTO_APPROVE_THRESHOLD", 0.0)
         if threshold <= 0:
@@ -53,7 +76,7 @@ class CategorizationPipeline:
                     threshold,
                     prediction.category.name,
                 )
-            return False
+            return "disabled", threshold
 
         if prediction.confidence < threshold:
             if log_low_confidence:
@@ -64,17 +87,75 @@ class CategorizationPipeline:
                     transaction_id,
                     prediction.category.name,
                 )
-            return False
+            return "low_confidence", threshold
 
-        return await self.apply_auto_approval(
+        return None, threshold
+
+    async def evaluate_auto_approval(
+        self,
+        transaction_id: str | int,
+        transaction: Transaction,
+        prediction: CategorizationResult,
+        existing_tags: list[str],
+        *,
+        include_existing_when_no_auto: bool = False,
+        log_auto_approve: bool = True,
+        log_disabled: bool = False,
+        log_low_confidence: bool = False,
+        threshold: float | None = None,
+    ) -> tuple[bool, str]:
+        reason, threshold_value = self.auto_approval_reason(
+            transaction_id,
+            prediction,
+            threshold=threshold,
+            log_disabled=log_disabled,
+            log_low_confidence=log_low_confidence,
+        )
+        if reason:
+            return False, reason
+
+        success = await self.apply_auto_approval(
             transaction_id,
             transaction,
             prediction,
             existing_tags,
             include_existing_when_no_auto=include_existing_when_no_auto,
             log_auto_approve=log_auto_approve,
-            threshold=threshold,
+            threshold=threshold_value,
         )
+        return success, "updated" if success else "failed"
+
+    async def predict_for_snapshot(
+        self,
+        snapshot: TransactionSnapshot,
+        *,
+        valid_categories: list[str] | None = None,
+        auto_approve_threshold: float = 0.0,
+    ) -> tuple[CategorizationResult | None, str | None, bool]:
+        existing_cat = snapshot.category_name
+        prediction: CategorizationResult | None = None
+        auto_approved = False
+
+        if not existing_cat:
+            prediction = await self.predict(
+                snapshot.transaction,
+                valid_categories=valid_categories,
+            )
+
+            if prediction and snapshot.transaction_id is not None:
+                success = await self.maybe_auto_approve(
+                    snapshot.transaction_id,
+                    snapshot.transaction,
+                    prediction,
+                    snapshot.tags,
+                    threshold=auto_approve_threshold,
+                )
+                if success:
+                    existing_cat = prediction.category.name
+                    auto_approved = True
+                    prediction = None
+
+        return prediction, existing_cat, auto_approved
 
     async def apply_auto_approval(
         self,
