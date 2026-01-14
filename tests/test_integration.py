@@ -54,43 +54,66 @@ async def test_firefly_yield_transactions() -> None:
 @pytest.mark.anyio
 async def test_train_endpoint_chunking() -> None:
     """Test that the /train endpoint processes chunks."""
-    from firefly_categorizer.main import train_models
+    from firefly_categorizer.services.training import TrainingManager
 
-    # We need to mock the global 'firefly' and 'service' in main.py
-    # But main.py imports them. We can patch them where they are used.
+    mock_firefly = MagicMock()
+    mock_service = MagicMock()
 
-    with patch("firefly_categorizer.main.firefly") as mock_firefly, \
-         patch("firefly_categorizer.main.service", new_callable=MagicMock) as mock_service:
+    batch1 = (
+        [{
+            "id": "1",
+            "attributes": {
+                "transactions": [{
+                    "description": "t1",
+                    "category_name": "C1",
+                    "amount": 1.0,
+                    "date": "2024-01-01",
+                }],
+            },
+        }],
+        {"total": 2},
+    )
+    batch2 = (
+        [{
+            "id": "2",
+            "attributes": {
+                "transactions": [{
+                    "description": "t2",
+                    "category_name": "C2",
+                    "amount": 2.0,
+                    "date": "2024-01-02",
+                }],
+            },
+        }],
+        {"total": 2},
+    )
 
-        # Setup yield_transactions to return 2 batches
-        batch1 = ([{"attributes": {"transactions": [{"description": "t1", "category_name": "C1"}]}}], {"total": 2})
-        batch2 = ([{"attributes": {"transactions": [{"description": "t2", "category_name": "C2"}]}}], {"total": 2})
+    async def mock_generator(
+        limit_per_page: int = 500
+    ) -> AsyncGenerator[tuple[list[dict[str, Any]], dict[str, Any]], None]:
+        yield batch1
+        yield batch2
 
-        async def mock_generator(
-            limit_per_page: int = 500
-        ) -> AsyncGenerator[tuple[list[dict[str, Any]], dict[str, Any]], None]:
-            yield batch1
-            yield batch2
+    mock_firefly.yield_transactions.side_effect = mock_generator
 
-        # yield_transactions should return the async generator object, not a coroutine
-        mock_firefly.yield_transactions.side_effect = mock_generator
+    training_manager = TrainingManager(
+        service=mock_service,
+        firefly=mock_firefly,
+        page_size=500,
+    )
 
-        # Run the endpoint function directly
-        result = await train_models()
+    result = await training_manager.train_bulk()
 
-        assert result["status"] == "success"
-        assert result["trained"] == 2
-        assert result["fetched"] == 2
+    assert result["status"] == "success"
+    assert result["trained"] == 2
+    assert result["fetched"] == 2
 
-        # Verify service.learn was called 2 times
-        assert mock_service.learn.call_count == 2
+    assert mock_service.learn.call_count == 2
 
-        # Verify call arguments
-        # call_args_list[0] -> call(Transaction(desc="t1"), Category(name="C1"))
-        args1, _ = mock_service.learn.call_args_list[0]
-        assert args1[0].description == "t1"
-        assert args1[1].name == "C1"
+    args1, _ = mock_service.learn.call_args_list[0]
+    assert args1[0].description == "t1"
+    assert args1[1].name == "C1"
 
-        args2, _ = mock_service.learn.call_args_list[1]
-        assert args2[0].description == "t2"
-        assert args2[1].name == "C2"
+    args2, _ = mock_service.learn.call_args_list[1]
+    assert args2[0].description == "t2"
+    assert args2[1].name == "C2"

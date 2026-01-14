@@ -1,23 +1,45 @@
 from collections.abc import Generator
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from fastapi.testclient import TestClient
 
 from firefly_categorizer.main import app
 from firefly_categorizer.models import CategorizationResult, Category
+from firefly_categorizer.services.categorization import CategorizationPipeline
 
 client = TestClient(app)
 
 @pytest.fixture
 def mock_firefly() -> Generator[AsyncMock, None, None]:
-    with patch("firefly_categorizer.main.firefly", new_callable=AsyncMock) as m:
-        yield m
+    had_firefly = hasattr(app.state, "firefly")
+    original_firefly = getattr(app.state, "firefly", None)
+    mock = AsyncMock()
+    app.state.firefly = mock
+    yield mock
+    if had_firefly:
+        app.state.firefly = original_firefly
+    else:
+        delattr(app.state, "firefly")
 
 @pytest.fixture
-def mock_service() -> Generator[MagicMock, None, None]:
-    with patch("firefly_categorizer.main.service", new_callable=MagicMock) as m:
-        yield m
+def mock_service(mock_firefly: AsyncMock) -> Generator[MagicMock, None, None]:
+    had_service = hasattr(app.state, "service")
+    had_pipeline = hasattr(app.state, "pipeline")
+    original_service = getattr(app.state, "service", None)
+    original_pipeline = getattr(app.state, "pipeline", None)
+    mock = MagicMock()
+    app.state.service = mock
+    app.state.pipeline = CategorizationPipeline(service=mock, firefly=mock_firefly)
+    yield mock
+    if had_service:
+        app.state.service = original_service
+    else:
+        delattr(app.state, "service")
+    if had_pipeline:
+        app.state.pipeline = original_pipeline
+    else:
+        delattr(app.state, "pipeline")
 
 def test_get_transactions_no_predict(mock_firefly: AsyncMock, mock_service: MagicMock) -> None:
     # Mock Firefly returning uncategorized transactions
@@ -48,7 +70,12 @@ def test_get_transactions_no_predict(mock_firefly: AsyncMock, mock_service: Magi
     mock_service.categorize.assert_not_called()
     assert data["transactions"][0]["prediction"] is None
 
-def test_get_transactions_with_predict(mock_firefly: AsyncMock, mock_service: MagicMock) -> None:
+def test_get_transactions_with_predict(
+    mock_firefly: AsyncMock,
+    mock_service: MagicMock,
+    monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("AUTO_APPROVE_THRESHOLD", "0")
     # Mock Firefly returning uncategorized transactions
     mock_firefly.get_categories.return_value = [{"attributes": {"name": "Food"}}]
     mock_firefly.get_transactions.return_value = {
