@@ -638,4 +638,70 @@
             justify-content: space-between;
         }
     }
+
+    :root[data-theme="dark"] .hero-panel {
+        background: linear-gradient(140deg, rgba(15, 23, 42, 0.95) 0%, rgba(30, 41, 59, 0.9) 100%);
+        border-color: rgba(148, 163, 184, 0.24);
+    }
+
+    :root[data-theme="dark"] .hero-panel::before {
+        background:
+            radial-gradient(circle at 12% 18%, rgba(34, 211, 238, 0.2), transparent 45%),
+            radial-gradient(circle at 88% 14%, rgba(248, 113, 113, 0.16), transparent 50%);
+    }
+
+    :root[data-theme="dark"] .scope-indicator {
+        background: rgba(148, 163, 184, 0.2);
+        color: var(--ink);
+    }
+
+    :root[data-theme="dark"] .scope-strip {
+        background: rgba(148, 163, 184, 0.14);
+        border-color: rgba(148, 163, 184, 0.2);
+        color: var(--ink-soft);
+    }
+
+    :root[data-theme="dark"] .scope-strip.is-all {
+        background: rgba(34, 211, 238, 0.18);
+        border-color: rgba(34, 211, 238, 0.45);
+        color: var(--ink);
+    }
+
+    :root[data-theme="dark"] .mode-track {
+        background: rgba(148, 163, 184, 0.12);
+        border-color: rgba(148, 163, 184, 0.25);
+        box-shadow: inset 0 1px 0 rgba(2, 6, 23, 0.6);
+    }
+
+    :root[data-theme="dark"] .mode-thumb {
+        background: linear-gradient(135deg, rgba(34, 211, 238, 0.55), rgba(96, 165, 250, 0.45));
+    }
+
+    :root[data-theme="dark"] .toggle-checkbox {
+        background: #0b1120;
+        border-color: rgba(148, 163, 184, 0.45);
+    }
+
+    :root[data-theme="dark"] .toggle-label {
+        background: rgba(148, 163, 184, 0.2);
+    }
+
+    :root[data-theme="dark"] .toggle-checkbox:disabled + .toggle-label {
+        background: rgba(148, 163, 184, 0.12);
+    }
+
+    :root[data-theme="dark"] .spinner {
+        border-color: rgba(148, 163, 184, 0.3);
+        border-left-color: var(--accent);
+    }
+
+    :root[data-theme="dark"] .meta-chip {
+        background: rgba(15, 23, 42, 0.8);
+        color: var(--ink-soft);
+    }
+
+    :root[data-theme="dark"] .inline-spinner {
+        border-color: rgba(148, 163, 184, 0.4);
+        border-top-color: transparent;
+    }
 </style>

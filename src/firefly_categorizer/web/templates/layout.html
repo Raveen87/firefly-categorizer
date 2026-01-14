@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,6 +8,23 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        (function() {
+            const root = document.documentElement;
+            const storageKey = 'firefly-theme';
+            try {
+                const stored = localStorage.getItem(storageKey);
+                if (stored === 'light' || stored === 'dark') {
+                    root.dataset.theme = stored;
+                    return;
+                }
+            } catch (error) {
+                // Ignore storage access issues.
+            }
+            const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+            root.dataset.theme = prefersDark ? 'dark' : 'light';
+        })();
+    </script>
     <style>
         :root {
             --font-sans: "Space Grotesk", "Segoe UI", sans-serif;
@@ -30,6 +47,26 @@
             --shadow-soft: 0 12px 28px rgba(15, 23, 42, 0.12);
         }
 
+        :root[data-theme="dark"] {
+            color-scheme: dark;
+            --ink: #e2e8f0;
+            --ink-soft: #cbd5f5;
+            --muted: #94a3b8;
+            --bg: #0b1120;
+            --bg-soft: #0f172a;
+            --panel: rgba(15, 23, 42, 0.88);
+            --panel-strong: #0f172a;
+            --panel-soft: #111827;
+            --line: rgba(148, 163, 184, 0.22);
+            --accent: #22d3ee;
+            --accent-strong: #06b6d4;
+            --accent-alt: #60a5fa;
+            --accent-warn: #fbbf24;
+            --accent-danger: #f87171;
+            --shadow: 0 18px 40px rgba(2, 6, 23, 0.7);
+            --shadow-soft: 0 12px 28px rgba(2, 6, 23, 0.6);
+        }
+
         body {
             background-color: var(--bg);
             background-image:
@@ -41,6 +78,17 @@
             color: var(--ink);
             font-family: var(--font-sans);
             min-height: 100vh;
+            transition: background-color 0.25s ease, color 0.25s ease;
+        }
+
+        :root[data-theme="dark"] body {
+            background-color: var(--bg);
+            background-image:
+                radial-gradient(circle at 14% 12%, rgba(34, 211, 238, 0.18), transparent 45%),
+                radial-gradient(circle at 86% 18%, rgba(248, 113, 113, 0.18), transparent 52%),
+                repeating-linear-gradient(90deg, rgba(148, 163, 184, 0.08) 0, rgba(148, 163, 184, 0.08) 1px, transparent 1px, transparent 90px),
+                repeating-linear-gradient(0deg, rgba(148, 163, 184, 0.06) 0, rgba(148, 163, 184, 0.06) 1px, transparent 1px, transparent 90px),
+                linear-gradient(180deg, #0b1120 0%, #0f172a 100%);
         }
 
         body, button, input, select, textarea {
@@ -92,7 +140,7 @@
 
         .app-nav {
             position: relative;
-            background: rgba(255, 255, 255, 0.86);
+            background: var(--panel);
             border-bottom: 1px solid var(--line);
             backdrop-filter: blur(18px);
             box-shadow: var(--shadow-soft);
@@ -113,6 +161,7 @@
             align-items: center;
             justify-content: space-between;
             gap: 16px;
+            flex-wrap: wrap;
         }
 
         .nav-logo {
@@ -135,7 +184,7 @@
             color: var(--ink);
             font-weight: 700;
             letter-spacing: 0.12em;
-            border: 1px solid rgba(15, 23, 42, 0.08);
+            border: 1px solid var(--line);
             box-shadow: var(--shadow-soft);
             font-family: var(--font-mono);
         }
@@ -145,6 +194,14 @@
             flex-wrap: wrap;
             gap: 10px;
             align-items: center;
+        }
+
+        .nav-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            justify-content: flex-end;
         }
 
         .nav-link {
@@ -166,11 +223,75 @@
             background: linear-gradient(135deg, rgba(31, 157, 176, 0.25), rgba(31, 157, 176, 0.45));
             color: var(--ink);
             border-color: rgba(31, 157, 176, 0.35);
-            box-shadow: 0 12px 24px rgba(15, 23, 42, 0.15);
+            box-shadow: var(--shadow-soft);
         }
 
         .nav-link-active:hover {
             color: var(--ink);
+        }
+
+        .theme-toggle {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 12px;
+            border-radius: 999px;
+            border: 1px solid var(--line);
+            background: var(--panel-strong);
+            color: var(--ink);
+            font-size: 0.7rem;
+            font-weight: 600;
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+            font-family: var(--font-mono);
+            transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+        }
+
+        .theme-toggle:hover {
+            transform: translateY(-1px);
+            box-shadow: var(--shadow-soft);
+            border-color: rgba(31, 157, 176, 0.45);
+        }
+
+        .theme-toggle:focus-visible {
+            outline: 2px solid rgba(31, 157, 176, 0.6);
+            outline-offset: 2px;
+        }
+
+        .theme-toggle[aria-pressed="true"] {
+            background: linear-gradient(135deg, rgba(34, 211, 238, 0.2), rgba(96, 165, 250, 0.18));
+            border-color: rgba(96, 165, 250, 0.5);
+        }
+
+        .theme-toggle-icon {
+            width: 16px;
+            height: 16px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .theme-toggle-icon svg {
+            width: 100%;
+            height: 100%;
+        }
+
+        .theme-toggle-moon {
+            display: none;
+        }
+
+        :root[data-theme="dark"] .theme-toggle-sun {
+            display: none;
+        }
+
+        :root[data-theme="dark"] .theme-toggle-moon {
+            display: inline-flex;
+        }
+
+        @media (max-width: 720px) {
+            .theme-toggle-text {
+                display: none;
+            }
         }
 
         .app-footer {
@@ -179,7 +300,7 @@
             text-align: center;
             color: var(--muted);
             font-size: 0.85rem;
-            background: rgba(255, 255, 255, 0.7);
+            background: var(--panel);
             border-top: 1px solid var(--line);
             backdrop-filter: blur(12px);
         }
@@ -195,16 +316,39 @@
                 <span class="nav-logo-mark">FF</span>
                 <span>Firefly Categorizer</span>
             </a>
-            <div class="nav-links">
-                <a href="/" class="nav-link {% if request.url.path == '/' %}nav-link-active{% endif %}">
-                    Categorize
-                </a>
-                <a href="/train" class="nav-link {% if request.url.path == '/train' %}nav-link-active{% endif %}">
-                    Training
-                </a>
-                <a href="/help" class="nav-link {% if request.url.path == '/help' %}nav-link-active{% endif %}">
-                    Help
-                </a>
+            <div class="nav-actions">
+                <div class="nav-links">
+                    <a href="/" class="nav-link {% if request.url.path == '/' %}nav-link-active{% endif %}">
+                        Categorize
+                    </a>
+                    <a href="/train" class="nav-link {% if request.url.path == '/train' %}nav-link-active{% endif %}">
+                        Training
+                    </a>
+                    <a href="/help" class="nav-link {% if request.url.path == '/help' %}nav-link-active{% endif %}">
+                        Help
+                    </a>
+                </div>
+                <button id="theme-toggle" class="theme-toggle" type="button" aria-pressed="false" aria-label="Switch to dark mode" title="Switch to dark mode">
+                    <span class="theme-toggle-icon theme-toggle-sun" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="4"></circle>
+                            <path d="M12 2v2"></path>
+                            <path d="M12 20v2"></path>
+                            <path d="M5 5l1.5 1.5"></path>
+                            <path d="M17.5 17.5L19 19"></path>
+                            <path d="M2 12h2"></path>
+                            <path d="M20 12h2"></path>
+                            <path d="M5 19l1.5-1.5"></path>
+                            <path d="M17.5 6.5L19 5"></path>
+                        </svg>
+                    </span>
+                    <span class="theme-toggle-icon theme-toggle-moon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 14.5a8.5 8.5 0 1 1-11.5-11 7 7 0 0 0 11.5 11z"></path>
+                        </svg>
+                    </span>
+                    <span class="theme-toggle-text">Light</span>
+                </button>
             </div>
         </div>
     </nav>
@@ -216,6 +360,73 @@
     <footer class="app-footer">
         &copy; 2026 Firefly Categorizer
     </footer>
+
+    <script>
+        (function() {
+            const root = document.documentElement;
+            const toggle = document.getElementById('theme-toggle');
+            if (!toggle) {
+                return;
+            }
+            const storageKey = 'firefly-theme';
+            const media = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+
+            function getStoredTheme() {
+                try {
+                    const stored = localStorage.getItem(storageKey);
+                    if (stored === 'light' || stored === 'dark') {
+                        return stored;
+                    }
+                } catch (error) {
+                    // Ignore storage access issues.
+                }
+                return null;
+            }
+
+            function applyTheme(theme, persist) {
+                root.dataset.theme = theme;
+                const isDark = theme === 'dark';
+                toggle.setAttribute('aria-pressed', String(isDark));
+                toggle.setAttribute('aria-label', isDark ? 'Switch to light mode' : 'Switch to dark mode');
+                toggle.title = isDark ? 'Switch to light mode' : 'Switch to dark mode';
+                const label = toggle.querySelector('.theme-toggle-text');
+                if (label) {
+                    label.textContent = isDark ? 'Dark' : 'Light';
+                }
+                if (persist) {
+                    try {
+                        localStorage.setItem(storageKey, theme);
+                    } catch (error) {
+                        // Ignore storage access issues.
+                    }
+                }
+            }
+
+            function getPreferredTheme() {
+                if (media && typeof media.matches === 'boolean') {
+                    return media.matches ? 'dark' : 'light';
+                }
+                return 'light';
+            }
+
+            const initialTheme = root.dataset.theme || getStoredTheme() || getPreferredTheme();
+            applyTheme(initialTheme, false);
+
+            toggle.addEventListener('click', () => {
+                const nextTheme = root.dataset.theme === 'dark' ? 'light' : 'dark';
+                applyTheme(nextTheme, true);
+            });
+
+            if (media) {
+                media.addEventListener('change', (event) => {
+                    if (getStoredTheme()) {
+                        return;
+                    }
+                    applyTheme(event.matches ? 'dark' : 'light', false);
+                });
+            }
+        })();
+    </script>
 
     {% block scripts %}{% endblock %}
 </body>
