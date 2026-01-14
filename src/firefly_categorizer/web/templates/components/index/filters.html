@@ -4,32 +4,34 @@
             <h2 class="panel-title">Filters</h2>
             <p class="panel-subtitle">Pick a window or review everything. Pagination always applies.</p>
         </div>
-        <div id="scope-indicator" class="scope-indicator">Date range</div>
+        <div id="scope-indicator" class="scope-indicator">
+            {% if scope == "all" %}All history{% else %}Date range{% endif %}
+        </div>
     </div>
 
     <form id="filter-form" action="/" method="get" class="filter-form">
         <div class="filter-grid">
             <div class="field-group">
-                <label class="field-label">View mode</label>
+                <label class="field-label">Filter scope</label>
                 <div class="mode-toggle">
                     <input type="checkbox" id="scope-all-toggle" name="scope" value="all" {% if scope == "all" %}checked{% endif %}>
                     <label class="mode-track" for="scope-all-toggle">
                         <span class="mode-option mode-range">Date range</span>
-                        <span class="mode-option mode-all">All transactions</span>
+                        <span class="mode-option mode-all">All history</span>
                         <span class="mode-thumb"></span>
                     </label>
                 </div>
-                <p id="scope-note" class="field-hint"></p>
+                <div id="scope-strip" class="scope-strip{% if scope == "all" %} is-all{% endif %}">{% if scope == "all" %}Filters off - displaying all transactions{% else %}Filters on - using date range{% endif %}</div>
             </div>
 
-            <div class="field-group" data-filter="date">
+            <div class="field-group{% if scope == "all" %} is-hidden is-disabled{% endif %}" data-filter="date">
                 <label class="field-label">Start date</label>
-                <input type="date" name="start_date" id="start-date" value="{{ start_date }}">
+                <input type="date" name="start_date" id="start-date" value="{{ start_date }}" {% if scope == "all" %}disabled{% endif %}>
             </div>
 
-            <div class="field-group" data-filter="date">
+            <div class="field-group{% if scope == "all" %} is-hidden is-disabled{% endif %}" data-filter="date">
                 <label class="field-label">End date</label>
-                <input type="date" name="end_date" id="end-date" value="{{ end_date }}">
+                <input type="date" name="end_date" id="end-date" value="{{ end_date }}" {% if scope == "all" %}disabled{% endif %}>
             </div>
 
             <div class="field-group">
@@ -57,7 +59,7 @@
         </div>
 
         <div class="actions-row">
-            <button type="submit" class="btn btn-primary">Fetch</button>
+            <button type="submit" id="fetch-btn" class="btn btn-primary">{% if scope == "all" %}Fetch all{% else %}Fetch range{% endif %}</button>
             <button type="button" id="categorize-btn" class="btn btn-secondary">Run categorization</button>
         </div>
     </form>

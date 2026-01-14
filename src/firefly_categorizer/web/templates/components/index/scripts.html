@@ -17,10 +17,11 @@
             dom.startDate = document.getElementById('start-date');
             dom.endDate = document.getElementById('end-date');
             dom.scopeToggle = document.getElementById('scope-all-toggle');
-            dom.scopeNote = document.getElementById('scope-note');
+            dom.scopeStrip = document.getElementById('scope-strip');
             dom.scopeIndicator = document.getElementById('scope-indicator');
             dom.showCategorized = document.getElementById('show-categorized');
             dom.limitSelect = document.getElementById('limit-select');
+            dom.fetchBtn = document.getElementById('fetch-btn');
             dom.categorizeBtn = document.getElementById('categorize-btn');
             dom.tableSubtitle = document.getElementById('table-subtitle');
             dom.metricTotal = document.getElementById('metric-total');
@@ -72,7 +73,10 @@
         function applyScopeUI() {
             const allScope = isAllScope();
             const dateFields = document.querySelectorAll('[data-filter="date"]');
-            dateFields.forEach((field) => field.classList.toggle('is-disabled', allScope));
+            dateFields.forEach((field) => {
+                field.classList.toggle('is-disabled', allScope);
+                field.classList.toggle('is-hidden', allScope);
+            });
             dom.startDate.disabled = allScope;
             dom.endDate.disabled = allScope;
             dom.showCategorized.disabled = false;
@@ -81,14 +85,14 @@
         }
 
         function updateScopeMeta() {
-            if (isAllScope()) {
-                dom.scopeIndicator.textContent = 'All transactions';
-                dom.scopeNote.textContent = 'Filters disabled. Paging through the full history.';
-            } else {
-                dom.scopeIndicator.textContent = 'Date range';
-                dom.scopeNote.textContent = 'Filters active. Narrow the window, then paginate.';
-                const startValue = dom.startDate.value || 'start';
-                const endValue = dom.endDate.value || 'end';
+            const allScope = isAllScope();
+            dom.scopeIndicator.textContent = allScope ? 'All history' : 'Date range';
+            dom.scopeStrip.textContent = allScope
+                ? 'Filters off - displaying all transactions'
+                : 'Filters on - using date range';
+            dom.scopeStrip.classList.toggle('is-all', allScope);
+            if (dom.fetchBtn) {
+                dom.fetchBtn.textContent = allScope ? 'Fetch all' : 'Fetch range';
             }
         }
 
