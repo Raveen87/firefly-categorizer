@@ -1,0 +1,37 @@
+<section class="help-section" style="animation-delay: 0.2s;">
+    <div class="help-section-heading">
+        <span class="help-kicker">Setup</span>
+        <div class="help-section-title-row">
+            <span class="help-section-icon help-icon-setup">
+                <svg aria-hidden="true" viewBox="0 0 24 24" class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M4 7h8"></path>
+                    <path d="M16 7h4"></path>
+                    <path d="M4 17h4"></path>
+                    <path d="M12 17h8"></path>
+                    <circle cx="14" cy="7" r="2"></circle>
+                    <circle cx="10" cy="17" r="2"></circle>
+                </svg>
+            </span>
+            <h2 class="help-section-title">Configuration and Features</h2>
+        </div>
+        <p class="help-section-subtitle">Tune automated behavior and connect real-time events.</p>
+    </div>
+
+    <div class="feature-grid">
+        <article class="feature-card">
+            <div class="feature-title">Auto-Approve</div>
+            <p class="feature-copy">
+                You can set an <code>AUTO_APPROVE_THRESHOLD</code> (e.g., 0.9) in your <code>.env</code> file.
+                If the system is confident enough in its prediction, it will automatically update Firefly III without waiting for your confirmation.
+            </p>
+        </article>
+
+        <article class="feature-card">
+            <div class="feature-title">Webhooks</div>
+            <p class="feature-copy">
+                The application can listen for real-time events from Firefly III.
+                If you configure a webhook in Firefly to point here, new transactions can be categorized instantly as they are created.
+            </p>
+        </article>
+    </div>
+</section>

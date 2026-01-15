@@ -1,0 +1,25 @@
+.feature-grid {
+    display: grid;
+    gap: 16px;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.feature-card {
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    padding: 18px;
+    background: var(--panel-strong);
+    box-shadow: var(--shadow-soft);
+    display: grid;
+    gap: 8px;
+}
+
+.feature-title {
+    font-weight: 700;
+    color: var(--ink);
+}
+
+.feature-copy {
+    color: var(--ink-soft);
+    font-size: 0.92rem;
+}

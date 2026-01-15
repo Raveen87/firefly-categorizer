@@ -1,0 +1,82 @@
+.help-hero {
+    border: 1px solid var(--line);
+    border-radius: 26px;
+    padding: 32px;
+    background: var(--panel);
+    box-shadow: var(--shadow);
+    display: grid;
+    gap: 16px;
+    position: relative;
+    overflow: hidden;
+    animation: help-reveal 0.6s ease both;
+}
+
+.help-hero::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--accent), var(--accent-alt));
+    opacity: 0.8;
+}
+
+.help-hero-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px 14px;
+    border-radius: 999px;
+    background: rgba(31, 157, 176, 0.12);
+    color: var(--accent-strong);
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    font-family: var(--font-mono);
+}
+
+.help-title {
+    font-family: var(--font-sans);
+    font-size: clamp(2rem, 4vw, 2.75rem);
+    font-weight: 700;
+    color: var(--ink);
+}
+
+.help-lead {
+    font-size: 1.05rem;
+    color: var(--ink-soft);
+    max-width: 44rem;
+}
+
+.help-hero-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.help-chip {
+    padding: 6px 12px;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    font-family: var(--font-mono);
+}
+
+.help-chip-memory {
+    background: rgba(31, 157, 176, 0.16);
+    color: var(--accent-strong);
+}
+
+.help-chip-ml {
+    background: rgba(37, 99, 235, 0.14);
+    color: #1d4ed8;
+}
+
+.help-chip-ai {
+    background: rgba(249, 115, 22, 0.18);
+    color: #b45309;
+}

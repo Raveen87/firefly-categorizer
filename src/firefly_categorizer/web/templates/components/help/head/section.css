@@ -1,0 +1,63 @@
+.help-section {
+    display: grid;
+    gap: 16px;
+    animation: help-reveal 0.6s ease both;
+}
+
+.help-section-heading {
+    display: grid;
+    gap: 6px;
+}
+
+.help-section-title-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.help-section-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 12px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(31, 157, 176, 0.14);
+    color: var(--accent-strong);
+}
+
+.help-icon-brain {
+    background: rgba(31, 157, 176, 0.16);
+    color: var(--accent-strong);
+}
+
+.help-icon-flow {
+    background: rgba(37, 99, 235, 0.16);
+    color: #1d4ed8;
+}
+
+.help-icon-setup {
+    background: rgba(249, 115, 22, 0.18);
+    color: #b45309;
+}
+
+.help-kicker {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.22em;
+    color: var(--accent-strong);
+    font-weight: 700;
+    font-family: var(--font-mono);
+}
+
+.help-section-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--ink);
+    font-family: var(--font-sans);
+}
+
+.help-section-subtitle {
+    font-size: 0.95rem;
+    color: var(--muted);
+}
