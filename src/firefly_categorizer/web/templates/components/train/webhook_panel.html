@@ -1,0 +1,26 @@
+<section class="webhook-panel mb-6">
+    <div class="webhook-header">
+        <div>
+            <div class="webhook-eyebrow">Realtime</div>
+            <h2 class="webhook-title">Firefly Webhook</h2>
+            <p class="webhook-subtitle">
+                Point Firefly III to this endpoint to auto-categorize new transactions.
+            </p>
+        </div>
+        <span class="webhook-chip">POST</span>
+    </div>
+    <div class="webhook-body">
+        <div class="webhook-url-row">
+            <input id="webhook-url" class="webhook-url" type="text" readonly
+                aria-label="Firefly webhook URL" value="">
+            <button id="webhook-copy-btn" type="button" class="webhook-copy" onclick="copyWebhookUrl()">
+                <svg aria-hidden="true" viewBox="0 0 24 24" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="9" y="9" width="11" height="11" rx="2"></rect>
+                    <rect x="4" y="4" width="11" height="11" rx="2"></rect>
+                </svg>
+                Copy URL
+            </button>
+        </div>
+        <div id="webhook-copy-status" class="webhook-status" role="status" aria-live="polite"></div>
+    </div>
+</section>

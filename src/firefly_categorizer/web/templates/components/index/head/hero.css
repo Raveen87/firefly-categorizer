@@ -1,0 +1,89 @@
+    .hero-panel {
+        position: relative;
+        overflow: hidden;
+        border-radius: 28px;
+        padding: 22px;
+        background: linear-gradient(140deg, rgba(255, 255, 255, 0.95) 0%, rgba(233, 246, 248, 0.9) 100%);
+        border: 1px solid var(--line);
+        box-shadow: var(--shadow);
+    }
+
+    .hero-panel::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background:
+            radial-gradient(circle at 12% 18%, rgba(31, 157, 176, 0.16), transparent 45%),
+            radial-gradient(circle at 88% 14%, rgba(249, 115, 22, 0.12), transparent 50%);
+        opacity: 0.85;
+        pointer-events: none;
+    }
+
+    .hero-panel::after {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 3px;
+        background: linear-gradient(90deg, var(--accent), var(--accent-alt), var(--accent-warn));
+        opacity: 0.8;
+    }
+
+    .hero-grid {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        gap: 24px;
+    }
+
+    .eyebrow {
+        font-size: 0.7rem;
+        letter-spacing: 0.28em;
+        text-transform: uppercase;
+        color: var(--ink-soft);
+        font-weight: 600;
+    }
+
+    .display-title {
+        font-size: clamp(2rem, 3.2vw, 3rem);
+        margin-top: 8px;
+    }
+
+    .hero-subtitle {
+        color: var(--ink-soft);
+        max-width: 540px;
+        margin-top: 12px;
+        font-size: 1rem;
+    }
+
+    .hero-metrics {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(120px, 1fr));
+        gap: 12px;
+    }
+
+    .metric-card {
+        background: var(--panel-strong);
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        padding: 14px;
+        box-shadow: var(--shadow-soft);
+    }
+
+    .metric-label {
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 0.2em;
+        color: var(--ink-soft);
+        font-family: var(--font-mono);
+    }
+
+    .metric-value {
+        display: block;
+        font-size: 1.4rem;
+        font-weight: 700;
+        margin-top: 6px;
+        font-family: var(--font-mono);
+        font-variant-numeric: tabular-nums;
+    }

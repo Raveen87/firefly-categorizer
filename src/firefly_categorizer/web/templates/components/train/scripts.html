@@ -1,0 +1,504 @@
+    <script>
+        let trainingEventSource = null;
+        let trainingStatusPoll = null;
+
+        function setTrainingButtonsLoading() {
+            const btn = document.getElementById('train-btn');
+            const menuBtn = document.getElementById('train-menu-btn');
+            if (!btn) {
+                return;
+            }
+            btn.disabled = true;
+            btn.classList.add('opacity-50', 'cursor-not-allowed');
+            if (menuBtn) {
+                menuBtn.disabled = true;
+                menuBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            }
+            btn.innerHTML = `
+                <svg class="animate-spin h-5 w-5 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Training...
+            `;
+        }
+
+        function stopTrainingStatusPoll() {
+            if (trainingStatusPoll) {
+                clearInterval(trainingStatusPoll);
+                trainingStatusPoll = null;
+            }
+        }
+
+        function startTrainingStatusPoll() {
+            if (trainingStatusPoll) {
+                return;
+            }
+            trainingStatusPoll = setInterval(async () => {
+                const status = await fetchTrainingStatus();
+                if (!status) {
+                    return;
+                }
+                applyTrainingStatus(status);
+                if (!status.active) {
+                    stopTrainingStatusPoll();
+                }
+            }, 2000);
+        }
+
+        async function fetchTrainingStatus() {
+            try {
+                const response = await fetch('/train-status', { method: 'GET' });
+                if (!response.ok) {
+                    return null;
+                }
+                return await response.json();
+            } catch (error) {
+                console.error('Training status error:', error);
+                return null;
+            }
+        }
+
+        function updateProcessingUI(data) {
+            const fetched = Number.isFinite(data.fetched)
+                ? data.fetched
+                : (Number.isFinite(data.total_fetched) ? data.total_fetched : 0);
+            const total = Number.isFinite(data.total)
+                ? data.total
+                : (Number.isFinite(data.total_fetched) ? data.total_fetched : 0);
+            const percent = Number.isFinite(data.percent)
+                ? data.percent
+                : (total > 0 ? Math.round((fetched / total) * 1000) / 10 : 0);
+            const avgSeconds = Number.isFinite(data.avg_last_10_seconds) ? data.avg_last_10_seconds : 0;
+            const remaining = total - fetched;
+            const etaText = remaining > 0 && avgSeconds
+                ? formatDuration(remaining * avgSeconds)
+                : 'N/A';
+            const statsText = total
+                ? `${fetched} / ${total} processed (${percent}%) | ETA: ${etaText}`
+                : `${fetched} processed`;
+
+            document.getElementById('process-stats').textContent = statsText;
+            document.getElementById('process-progress').style.width = `${percent}%`;
+            document.getElementById('process-trained').textContent = data.trained ?? 0;
+            document.getElementById('process-skipped').textContent = data.skipped ?? 0;
+            document.getElementById('process-average').textContent = avgSeconds
+                ? formatDuration(avgSeconds)
+                : 'N/A';
+        }
+
+        function applyTrainingStatus(data) {
+            if (!data || !data.stage || data.stage === 'idle') {
+                return;
+            }
+
+            document.getElementById('stages-container').classList.remove('hidden');
+            document.getElementById('stage-error').classList.add('hidden');
+            document.getElementById('stage-paused').classList.add('hidden');
+
+            if (data.stage === 'error') {
+                document.getElementById('stage-error').classList.remove('hidden');
+                document.getElementById('error-message').textContent = data.message || 'Training error.';
+                resetButton();
+                return;
+            }
+
+            if (data.stage === 'complete') {
+                document.getElementById('stage-processing').classList.add('hidden');
+                document.getElementById('stage-complete').classList.remove('hidden');
+                document.getElementById('result-trained').textContent = data.trained ?? 0;
+                document.getElementById('result-skipped').textContent = data.skipped ?? 0;
+                document.getElementById('result-total').textContent = data.total_fetched ?? data.fetched ?? 0;
+                document.getElementById('process-progress').style.width = '100%';
+                resetButton();
+                return;
+            }
+
+            document.getElementById('stage-processing').classList.remove('hidden');
+            document.getElementById('stage-complete').classList.add('hidden');
+
+            if (data.stage === 'start') {
+                document.getElementById('process-stats').textContent = 'Initializing...';
+                document.getElementById('process-progress').style.width = '0%';
+                document.getElementById('process-trained').textContent = '0';
+                document.getElementById('process-skipped').textContent = '0';
+                document.getElementById('process-average').textContent = 'N/A';
+            } else {
+                updateProcessingUI(data);
+            }
+
+            if (data.stage === 'paused') {
+                const pausedMessage = document.getElementById('paused-message');
+                const totalEstimate = data.total || data.total_fetched || data.fetched || 0;
+                const summary = totalEstimate
+                    ? `Paused after ${data.total_fetched ?? data.fetched ?? 0} of ${totalEstimate} processed.`
+                    : `Paused after ${data.total_fetched ?? data.fetched ?? 0} processed.`;
+                if (pausedMessage) {
+                    pausedMessage.textContent = summary;
+                }
+                document.getElementById('stage-paused').classList.remove('hidden');
+                resetButton();
+                return;
+            }
+
+            if (data.active) {
+                setTrainingButtonsLoading();
+                setPauseButtonState('active');
+            } else {
+                resetButton();
+            }
+        }
+
+        function closeTrainMenu() {
+            const menu = document.getElementById('train-menu');
+            const btn = document.getElementById('train-menu-btn');
+            if (!menu || !btn) {
+                return;
+            }
+            menu.classList.add('hidden');
+            btn.setAttribute('aria-expanded', 'false');
+        }
+
+        function toggleTrainMenu() {
+            const menu = document.getElementById('train-menu');
+            const btn = document.getElementById('train-menu-btn');
+            if (!menu || !btn || btn.disabled) {
+                return;
+            }
+            const isHidden = menu.classList.contains('hidden');
+            if (isHidden) {
+                menu.classList.remove('hidden');
+                btn.setAttribute('aria-expanded', 'true');
+            } else {
+                closeTrainMenu();
+            }
+        }
+
+        document.addEventListener('click', (event) => {
+            const wrapper = document.getElementById('train-menu-wrapper');
+            if (!wrapper || wrapper.contains(event.target)) {
+                return;
+            }
+            closeTrainMenu();
+        });
+
+        async function clearModels() {
+            if (!confirm("⚠️ DANGER: Are you sure you want to clear all models?\n\nThis will permanently delete all learned transaction patterns. Future categorizations will be inaccurate until you retrain the models.\n\nOnly proceed if you are testing or need to reset corrupted data.")) {
+                return;
+            }
+            
+            const btn = document.getElementById('clear-btn');
+            const originalText = btn.innerHTML;
+            btn.disabled = true;
+            btn.textContent = "Clearing...";
+            
+            try {
+                const response = await fetch('/clear-models', { method: 'POST' });
+                const data = await response.json();
+                if (data.status === 'success') {
+                    alert('Models cleared successfully!');
+                } else {
+                    alert('Error clearing models');
+                }
+            } catch (e) {
+                alert('Error: ' + e);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+            }
+        }
+
+        function setStageActive(stageId) {
+            const stage = document.getElementById(stageId);
+            stage.classList.remove('stage-pending');
+            stage.classList.add('stage-active');
+        }
+
+        function setStageComplete(stageId, icon) {
+            const stage = document.getElementById(stageId);
+            stage.classList.remove('stage-pending', 'stage-active');
+            stage.classList.add('stage-complete');
+            document.getElementById(stageId.replace('stage-', '') + '-icon').textContent = icon || '✅';
+        }
+
+        function formatDuration(seconds) {
+            if (!Number.isFinite(seconds) || seconds <= 0) {
+                return '0s';
+            }
+            if (seconds < 1) {
+                const ms = Math.max(0, Math.round(seconds * 1000));
+                return `${ms}ms`;
+            }
+            const totalSeconds = Math.round(seconds);
+            const hours = Math.floor(totalSeconds / 3600);
+            const minutes = Math.floor((totalSeconds % 3600) / 60);
+            const secs = totalSeconds % 60;
+            if (hours > 0) {
+                return `${hours}h ${minutes}m ${secs}s`;
+            }
+            if (minutes > 0) {
+                return `${minutes}m ${secs}s`;
+            }
+            return `${secs}s`;
+        }
+
+        function setPauseButtonState(state) {
+            const pauseBtn = document.getElementById('pause-btn');
+            if (!pauseBtn) {
+                return;
+            }
+            if (state === 'active') {
+                pauseBtn.disabled = false;
+                pauseBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                pauseBtn.innerHTML = `
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <rect x="5" y="5" width="10" height="10" rx="1.5"></rect>
+                    </svg>
+                    Pause Training
+                `;
+                return;
+            }
+            if (state === 'pausing') {
+                pauseBtn.disabled = true;
+                pauseBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                pauseBtn.textContent = 'Pausing...';
+                return;
+            }
+            pauseBtn.disabled = true;
+            pauseBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            pauseBtn.innerHTML = `
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <rect x="5" y="5" width="10" height="10" rx="1.5"></rect>
+                </svg>
+                Pause Training
+            `;
+        }
+
+        async function pauseTraining() {
+            if (!trainingEventSource) {
+                return;
+            }
+            setPauseButtonState('pausing');
+            try {
+                await fetch('/train-pause', { method: 'POST' });
+            } catch (error) {
+                console.error('Pause training error:', error);
+            }
+        }
+
+        async function startTraining(startFresh = false) {
+            closeTrainMenu();
+            stopTrainingStatusPoll();
+            if (trainingEventSource) {
+                trainingEventSource.close();
+                trainingEventSource = null;
+            }
+
+            if (startFresh) {
+                const confirmReset = confirm(
+                    'Start fresh import?\n\nThis clears all learned models and resets training progress tracking. Transactions will be retrained from scratch.'
+                );
+                if (!confirmReset) {
+                    return;
+                }
+                try {
+                    const response = await fetch('/clear-models', { method: 'POST' });
+                    if (!response.ok) {
+                        const data = await response.json().catch(() => ({}));
+                        const detail = data.message || data.detail || 'Unable to clear models.';
+                        alert(detail);
+                        return;
+                    }
+                } catch (error) {
+                    console.error('Clear models error:', error);
+                    alert('Unable to clear models.');
+                    return;
+                }
+            }
+
+            setTrainingButtonsLoading();
+
+            // Show stages container and reset states
+            document.getElementById('stages-container').classList.remove('hidden');
+            document.getElementById('stage-complete').classList.add('hidden');
+            document.getElementById('stage-error').classList.add('hidden');
+            document.getElementById('stage-paused').classList.add('hidden');
+            document.getElementById('stage-processing').classList.remove('hidden');
+            setPauseButtonState('active');
+            
+            // Reset stats
+            document.getElementById('process-progress').style.width = '0%';
+            document.getElementById('process-stats').textContent = 'Starting...';
+            document.getElementById('process-trained').textContent = '0';
+            document.getElementById('process-skipped').textContent = '0';
+            document.getElementById('process-average').textContent = 'N/A';
+
+            // Connect to SSE endpoint
+            const eventSource = new EventSource('/train-stream');
+            trainingEventSource = eventSource;
+
+            eventSource.onmessage = function (event) {
+                const data = JSON.parse(event.data);
+
+                if (data.stage === 'start') {
+                    document.getElementById('process-stats').textContent = 'Initializing...';
+                }
+                else if (data.stage === 'processing') {
+                    const remaining = (data.total || 0) - (data.fetched || 0);
+                    const avgSeconds = data.avg_last_10_seconds || 0;
+                    const etaText = remaining > 0 && avgSeconds
+                        ? formatDuration(remaining * avgSeconds)
+                        : 'N/A';
+                    document.getElementById('process-stats').textContent =
+                        `${data.fetched} / ${data.total} processed (${data.percent}%) | ETA: ${etaText}`;
+                    document.getElementById('process-progress').style.width = `${data.percent}%`;
+                    document.getElementById('process-trained').textContent = data.trained;
+                    document.getElementById('process-skipped').textContent = data.skipped;
+                    document.getElementById('process-average').textContent = avgSeconds
+                        ? formatDuration(avgSeconds)
+                        : 'N/A';
+                }
+                else if (data.stage === 'complete') {
+                    document.getElementById('process-stats').textContent = 'Done';
+                    document.getElementById('process-progress').style.width = '100%';
+                    document.getElementById('stage-processing').classList.add('hidden');
+
+                    // Show complete section
+                    document.getElementById('stage-complete').classList.remove('hidden');
+                    document.getElementById('result-trained').textContent = data.trained;
+                    document.getElementById('result-skipped').textContent = data.skipped;
+                    document.getElementById('result-total').textContent = data.total_fetched;
+
+                    eventSource.close();
+                    trainingEventSource = null;
+                    resetButton();
+                }
+                else if (data.stage === 'paused') {
+                    const pausedMessage = document.getElementById('paused-message');
+                    const totalEstimate = data.total || data.total_fetched || 0;
+                    const summary = totalEstimate
+                        ? `Paused after ${data.total_fetched} of ${totalEstimate} processed.`
+                        : `Paused after ${data.total_fetched} processed.`;
+                    if (pausedMessage) {
+                        pausedMessage.textContent = summary;
+                    }
+                    if (typeof data.percent === 'number') {
+                        document.getElementById('process-progress').style.width = `${data.percent}%`;
+                    }
+                    document.getElementById('stage-paused').classList.remove('hidden');
+
+                    eventSource.close();
+                    trainingEventSource = null;
+                    resetButton();
+                }
+                else if (data.stage === 'error') {
+                    document.getElementById('stage-error').classList.remove('hidden');
+                    document.getElementById('error-message').textContent = data.message;
+
+                    eventSource.close();
+                    trainingEventSource = null;
+                    resetButton();
+                }
+            };
+
+            eventSource.onerror = function (error) {
+                console.error('SSE Error:', error);
+                document.getElementById('stage-error').classList.remove('hidden');
+                document.getElementById('error-message').textContent = 'Connection lost. Check server logs.';
+                eventSource.close();
+                trainingEventSource = null;
+                resetButton();
+            };
+        }
+
+        function resetButton() {
+            const btn = document.getElementById('train-btn');
+            const menuBtn = document.getElementById('train-menu-btn');
+            closeTrainMenu();
+            btn.disabled = false;
+            btn.classList.remove('opacity-50', 'cursor-not-allowed');
+            btn.innerHTML = `
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd" />
+                </svg>
+                Resume Training
+            `;
+            if (menuBtn) {
+                menuBtn.disabled = false;
+                menuBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            }
+            setPauseButtonState('idle');
+        }
+
+        function buildWebhookUrl() {
+            const currentUrl = new URL(window.location.href);
+            let basePath = currentUrl.pathname.replace(/\/train\/?$/, "");
+            if (basePath.endsWith("/")) {
+                basePath = basePath.slice(0, -1);
+            }
+            currentUrl.pathname = `${basePath}/webhook/firefly`;
+            currentUrl.search = "";
+            currentUrl.hash = "";
+            return currentUrl.toString();
+        }
+
+        function setWebhookStatus(message, state) {
+            const status = document.getElementById('webhook-copy-status');
+            if (!status) {
+                return;
+            }
+            status.textContent = message;
+            status.classList.remove('webhook-status-success', 'webhook-status-error');
+            if (state === 'success') {
+                status.classList.add('webhook-status-success');
+            } else if (state === 'error') {
+                status.classList.add('webhook-status-error');
+            }
+        }
+
+        function setWebhookUrl() {
+            const input = document.getElementById('webhook-url');
+            if (!input) {
+                return;
+            }
+            input.value = buildWebhookUrl();
+        }
+
+        async function copyWebhookUrl() {
+            const input = document.getElementById('webhook-url');
+            if (!input) {
+                return;
+            }
+            const value = input.value.trim();
+            if (!value) {
+                setWebhookStatus('Unable to determine webhook URL.', 'error');
+                return;
+            }
+            try {
+                if (navigator.clipboard && window.isSecureContext) {
+                    await navigator.clipboard.writeText(value);
+                } else {
+                    input.focus();
+                    input.select();
+                    document.execCommand('copy');
+                    input.setSelectionRange(0, 0);
+                }
+                setWebhookStatus('Webhook URL copied.', 'success');
+            } catch (error) {
+                console.error('Webhook copy error:', error);
+                setWebhookStatus('Copy failed. Please copy manually.', 'error');
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            setWebhookUrl();
+            const status = await fetchTrainingStatus();
+            if (!status) {
+                return;
+            }
+            applyTrainingStatus(status);
+            if (status.active || status.stage === 'start' || status.stage === 'processing') {
+                startTrainingStatusPoll();
+            }
+        });
+    </script>

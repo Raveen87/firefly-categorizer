@@ -1,0 +1,73 @@
+        .training-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            padding: 16px;
+            border-radius: 16px;
+            border: 1px dashed #cbd5f5;
+            background: rgba(255, 255, 255, 0.75);
+        }
+
+        .training-action {
+            border: 1px solid transparent;
+            box-shadow: 0 12px 24px -18px rgba(15, 23, 42, 0.7);
+            transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
+        }
+
+        .training-action:hover:not(:disabled) {
+            transform: translateY(-1px);
+            box-shadow: 0 16px 32px -20px rgba(15, 23, 42, 0.7);
+        }
+
+        .training-action-primary {
+            background: linear-gradient(135deg, #4f46e5, #0ea5e9);
+            color: #ffffff;
+            border-color: rgba(79, 70, 229, 0.4);
+        }
+
+        .training-action-primary:hover:not(:disabled) {
+            filter: brightness(1.05);
+        }
+
+        .training-action-warning {
+            background: linear-gradient(135deg, #fef3c7, #fde68a);
+            color: #92400e;
+            border-color: rgba(251, 191, 36, 0.5);
+        }
+
+        .training-action-danger {
+            background: linear-gradient(135deg, #fee2e2, #fecaca);
+            color: #b91c1c;
+            border-color: rgba(239, 68, 68, 0.4);
+        }
+
+        .training-action:disabled {
+            box-shadow: none;
+            filter: grayscale(0.2);
+        }
+
+        .training-menu {
+            border-radius: 14px;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 20px 36px -28px rgba(15, 23, 42, 0.7);
+            background: #ffffff;
+            overflow: hidden;
+        }
+
+        .training-menu button {
+            font-weight: 600;
+        }
+
+        .training-warning {
+            padding: 14px 16px;
+            border-radius: 14px;
+            border: 1px solid #fecaca;
+            background: linear-gradient(120deg, #fff1f2 0%, #fef2f2 100%);
+            color: #9f1239;
+            font-size: 0.86rem;
+        }
+
+        .training-warning p {
+            margin: 0;
+        }
+

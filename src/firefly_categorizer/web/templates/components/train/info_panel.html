@@ -1,0 +1,39 @@
+<!-- Info Section -->
+<div class="mb-6">
+    <details class="training-info-panel">
+        <summary class="training-info-summary">
+            <div class="info-summary-text">
+                <span class="info-summary-eyebrow">Training Guide</span>
+                <span class="info-summary-title">What is this?</span>
+                <span class="info-summary-subtitle">How the models learn from your Firefly history.</span>
+            </div>
+        </summary>
+        <div class="training-info-body">
+            <p class="text-muted mb-4">
+                This feature trains the categorization models using your existing transaction history from Firefly III.
+                It fetches all transactions that already have categories assigned and uses them to teach the
+                <strong>Memory</strong> and <strong>TF-IDF</strong> classifiers.
+            </p>
+
+            <div class="grid gap-4 lg:grid-cols-2">
+                <div class="info-block info-block-accent">
+                    <h3 class="info-block-title text-accent">How it works:</h3>
+                    <ul class="list-disc list-inside text-muted mt-2 space-y-1">
+                        <li><strong>Memory Matcher:</strong> Stores exact transaction descriptions for instant matching</li>
+                        <li><strong>TF-IDF Classifier:</strong> Learns patterns from your categorization history using
+                            machine learning</li>
+                    </ul>
+                </div>
+
+                <div class="info-block info-block-warn">
+                    <h3 class="info-block-title text-warn">When to use:</h3>
+                    <ul class="list-disc list-inside text-muted mt-2 space-y-1">
+                        <li>First time setup - bootstrap models with your existing data</li>
+                        <li>After manually categorizing many transactions in Firefly</li>
+                        <li>After restoring from a backup or migrating to a new instance</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </details>
+</div>

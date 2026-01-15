@@ -1,0 +1,7 @@
+    @media (min-width: 900px) {
+        .hero-grid {
+            flex-direction: row;
+            align-items: center;
+            justify-content: space-between;
+        }
+    }

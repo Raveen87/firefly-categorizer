@@ -1,0 +1,77 @@
+<!-- All Stages Container - shown when training starts -->
+<div id="stages-container" class="hidden progress-stage-stack">
+
+    <!-- Processing Stage -->
+    <div id="stage-processing" class="stage-active progress-stage-card progress-stage-active">
+        <div class="flex items-center justify-between mb-3 flex-wrap gap-3">
+            <div class="flex items-center gap-2">
+                <span class="font-medium text-ink">Processing Transactions</span>
+            </div>
+            <span id="process-stats" class="progress-stats">Starting...</span>
+        </div>
+        <div class="w-full progress-track">
+            <div id="process-progress" class="progress-bar progress-fill" style="width: 0%"></div>
+        </div>
+
+        <div class="grid grid-cols-3 gap-4 mt-3">
+            <div class="progress-stat progress-stat-indigo">
+                <span class="progress-stat-label">Trained</span>
+                <span class="progress-stat-value" id="process-trained">0</span>
+            </div>
+            <div class="progress-stat progress-stat-neutral">
+                <span class="progress-stat-label" title="Non-categorized transactions.">Skipped</span>
+                <span class="progress-stat-value" id="process-skipped">0</span>
+            </div>
+            <div class="progress-stat progress-stat-amber">
+                <span class="progress-stat-label">Avg (last 10)</span>
+                <span class="progress-stat-value" id="process-average">N/A</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Complete Stage -->
+    <div id="stage-complete" class="hidden progress-stage-card progress-stage-success">
+        <div class="flex items-center justify-between flex-wrap gap-3 mb-4">
+            <div class="flex items-center gap-2">
+                <span class="status-icon status-icon-success">OK</span>
+                <span class="status-title">Training Complete!</span>
+            </div>
+            <span class="progress-chip progress-chip-success">All stages done</span>
+        </div>
+        <div class="result-grid">
+            <div class="result-card result-card-trained">
+                <div id="result-trained" class="result-value">0</div>
+                <div class="result-label">Trained</div>
+            </div>
+            <div class="result-card result-card-skipped">
+                <div id="result-skipped" class="result-value">0</div>
+                <div class="result-label" title="Non-categorized transactions.">Skipped</div>
+            </div>
+            <div class="result-card result-card-total">
+                <div id="result-total" class="result-value">0</div>
+                <div class="result-label">Total Processed</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Error -->
+<div id="stage-error" class="hidden progress-stage-card progress-stage-error">
+    <div class="flex items-start gap-3">
+        <span class="status-icon status-icon-error">!</span>
+        <div>
+            <div class="status-title text-danger">Error</div>
+            <div id="error-message" class="text-danger text-sm mt-1"></div>
+        </div>
+    </div>
+</div>
+
+<div id="stage-paused" class="hidden progress-stage-card progress-stage-paused">
+    <div class="flex items-start gap-3">
+        <span class="status-icon status-icon-paused">||</span>
+        <div>
+            <div class="status-title text-amber-700">Training paused.</div>
+            <div id="paused-message" class="text-amber-600 text-sm mt-1"></div>
+        </div>
+    </div>
+</div>

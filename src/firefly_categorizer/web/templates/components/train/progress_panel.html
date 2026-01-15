@@ -1,0 +1,16 @@
+<!-- Training Controls -->
+<div class="training-progress-panel">
+    <div class="training-progress-header">
+        <div class="progress-header-text">
+            <span class="progress-eyebrow">Model Console</span>
+            <h2 class="progress-title">Training Progress</h2>
+            <p class="progress-subtitle">Live run stats and controls for the categorizer.</p>
+        </div>
+        <div class="progress-chip">Status Console</div>
+    </div>
+
+    <div class="training-progress-body">
+        {% include "components/train/progress_stages.html" %}
+        {% include "components/train/progress_actions.html" %}
+    </div>
+</div>

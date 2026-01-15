@@ -1,0 +1,79 @@
+    .table-meta {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+        margin: 16px 0 8px;
+    }
+
+    .meta-chip {
+        padding: 6px 12px;
+        border-radius: 999px;
+        border: 1px dashed var(--line);
+        font-size: 0.7rem;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--ink-soft);
+        background: rgba(255, 255, 255, 0.7);
+        font-family: var(--font-mono);
+    }
+
+    .table-shell {
+        overflow-x: auto;
+        border-radius: 18px;
+        border: 1px solid var(--line);
+        background: var(--panel-strong);
+    }
+
+    .transactions-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    .transactions-table thead th {
+        text-align: left;
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 0.18em;
+        color: var(--ink-soft);
+        background: var(--panel-soft);
+        padding: 12px;
+        font-family: var(--font-mono);
+    }
+
+    .transactions-table tbody td {
+        padding: 12px;
+        border-bottom: 1px solid var(--line);
+        font-size: 0.95rem;
+    }
+
+    .table-row {
+        transition: background 0.2s ease;
+    }
+
+    .table-row:hover {
+        background: rgba(31, 157, 176, 0.08);
+    }
+
+    .table-row.is-categorized {
+        background: var(--bg-soft);
+        color: var(--muted);
+    }
+
+    .prediction {
+        font-weight: 700;
+        color: var(--accent);
+    }
+
+    .tag {
+        display: inline-block;
+        margin-left: 6px;
+        font-size: 0.65rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--accent-alt);
+        font-family: var(--font-mono);
+    }
+
+    .tag-muted {
+        color: var(--muted);
+    }

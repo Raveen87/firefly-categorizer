@@ -1,0 +1,92 @@
+    .toggle-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+
+    .toggle-text {
+        font-size: 0.9rem;
+        color: var(--ink-soft);
+        line-height: 1.4;
+        flex: 1 1 160px;
+        min-width: 160px;
+    }
+
+    .toggle-switch {
+        position: relative;
+        width: 44px;
+        height: 24px;
+        flex: 0 0 44px;
+    }
+
+    .tooltip::after {
+        content: attr(data-tooltip);
+        position: absolute;
+        left: 50%;
+        top: -12px;
+        transform: translate(-50%, -100%);
+        background: #0f172a;
+        color: #fff;
+        padding: 6px 10px;
+        border-radius: 8px;
+        font-size: 0.75rem;
+        letter-spacing: 0.02em;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.2s ease, transform 0.2s ease;
+        width: max-content;
+        max-width: 220px;
+        white-space: normal;
+        text-align: center;
+        z-index: 5;
+    }
+
+    .tooltip:hover::after,
+    .tooltip:focus-within::after {
+        opacity: 1;
+        transform: translate(-50%, -112%);
+    }
+
+    .toggle-checkbox {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 24px;
+        height: 24px;
+        border-radius: 999px;
+        background: #fff;
+        border: 2px solid rgba(15, 23, 42, 0.2);
+        appearance: none;
+        cursor: pointer;
+        transition: transform 0.2s ease, border 0.2s ease;
+    }
+
+    .toggle-checkbox:checked {
+        transform: translateX(20px);
+        border-color: var(--accent);
+    }
+
+    .toggle-label {
+        display: block;
+        width: 44px;
+        height: 24px;
+        background: rgba(15, 23, 42, 0.12);
+        border-radius: 999px;
+        cursor: pointer;
+        transition: background 0.2s ease;
+    }
+
+    .toggle-checkbox:checked + .toggle-label {
+        background: rgba(31, 157, 176, 0.35);
+    }
+
+    .toggle-checkbox:disabled {
+        cursor: not-allowed;
+        background: var(--panel-soft);
+    }
+
+    .toggle-checkbox:disabled + .toggle-label {
+        background: #e5e7eb;
+        cursor: not-allowed;
+    }

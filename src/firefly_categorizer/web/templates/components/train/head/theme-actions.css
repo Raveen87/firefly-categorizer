@@ -1,0 +1,60 @@
+        .training-actions {
+            border: 1px dashed rgba(31, 157, 176, 0.25);
+            background: rgba(255, 255, 255, 0.75);
+        }
+
+        .training-action {
+            box-shadow: var(--shadow-soft);
+        }
+
+        .training-action-primary {
+            background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+            color: #ffffff;
+            border-color: rgba(31, 157, 176, 0.5);
+        }
+
+        #train-menu-btn.training-action-primary {
+            background: linear-gradient(135deg, var(--accent-strong), var(--accent));
+            border-left-color: rgba(255, 255, 255, 0.35);
+        }
+
+        .training-action-warning {
+            background: linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(249, 115, 22, 0.3));
+            color: #92400e;
+            border-color: rgba(245, 158, 11, 0.5);
+        }
+
+        .training-action-danger {
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.2), rgba(248, 113, 113, 0.3));
+            color: #991b1b;
+            border-color: rgba(239, 68, 68, 0.5);
+        }
+
+        .training-menu {
+            border: none;
+            box-shadow: none;
+            background: transparent;
+            padding: 6px;
+        }
+
+        .training-menu-item {
+            width: 100%;
+            text-align: left;
+            border-radius: 14px;
+        }
+
+        .training-menu-item:hover {
+            filter: brightness(1.05);
+        }
+
+        .training-warning {
+            border-color: rgba(239, 68, 68, 0.35);
+            background: rgba(239, 68, 68, 0.08);
+            color: #7f1d1d;
+        }
+
+        .warning-icon {
+            background: rgba(239, 68, 68, 0.18);
+            color: #b91c1c;
+        }
+

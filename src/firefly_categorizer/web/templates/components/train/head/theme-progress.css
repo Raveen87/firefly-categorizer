@@ -1,0 +1,160 @@
+        .training-progress-panel {
+            border: 1px solid var(--line);
+            background: var(--panel);
+            box-shadow: var(--shadow);
+        }
+
+        .training-progress-panel::before {
+            height: 3px;
+            background: linear-gradient(90deg, var(--accent), var(--accent-alt));
+        }
+
+        .progress-eyebrow {
+            color: var(--accent-strong);
+            font-family: var(--font-mono);
+        }
+
+        .progress-title {
+            color: var(--ink);
+            font-family: var(--font-sans);
+        }
+
+        .progress-subtitle {
+            color: var(--muted);
+        }
+
+        .progress-chip {
+            background: rgba(31, 157, 176, 0.12);
+            color: var(--accent-strong);
+            font-family: var(--font-mono);
+        }
+
+        .progress-chip-success {
+            background: rgba(34, 197, 94, 0.16);
+            color: #15803d;
+        }
+
+        .progress-stage-card {
+            border: 1px solid var(--line);
+            background: var(--panel-strong);
+            box-shadow: var(--shadow-soft);
+        }
+
+        .progress-stage-active {
+            border-color: rgba(31, 157, 176, 0.4);
+            background: rgba(31, 157, 176, 0.08);
+        }
+
+        .progress-stage-success {
+            border-color: rgba(34, 197, 94, 0.4);
+            background: rgba(34, 197, 94, 0.08);
+        }
+
+        .progress-stage-error {
+            border-color: rgba(239, 68, 68, 0.4);
+            background: rgba(239, 68, 68, 0.08);
+        }
+
+        .progress-stage-paused {
+            border-color: rgba(245, 158, 11, 0.4);
+            background: rgba(245, 158, 11, 0.08);
+        }
+
+        .progress-stats {
+            background: rgba(15, 23, 42, 0.06);
+            color: var(--ink-soft);
+            font-family: var(--font-mono);
+        }
+
+        .progress-track {
+            background: var(--panel-soft);
+        }
+
+        .progress-fill {
+            background: linear-gradient(90deg, var(--accent), var(--accent-alt));
+            box-shadow: 0 0 12px rgba(31, 157, 176, 0.35);
+        }
+
+        .progress-stat {
+            border-color: var(--line);
+            background: var(--panel-strong);
+        }
+
+        .progress-stat-label {
+            color: var(--muted);
+            font-family: var(--font-mono);
+        }
+
+        .progress-stat-value {
+            font-family: var(--font-mono);
+        }
+
+        .progress-stat-indigo {
+            border-color: rgba(37, 99, 235, 0.3);
+            background: rgba(37, 99, 235, 0.08);
+        }
+
+        .progress-stat-indigo .progress-stat-value {
+            color: #1d4ed8;
+        }
+
+        .progress-stat-neutral {
+            border-color: var(--line);
+            background: var(--panel-soft);
+        }
+
+        .progress-stat-neutral .progress-stat-value {
+            color: var(--ink-soft);
+        }
+
+        .progress-stat-amber {
+            border-color: rgba(245, 158, 11, 0.35);
+            background: rgba(245, 158, 11, 0.1);
+        }
+
+        .progress-stat-amber .progress-stat-value {
+            color: #b45309;
+        }
+
+        .status-icon {
+            font-family: var(--font-mono);
+        }
+
+        .status-icon-success {
+            background: rgba(34, 197, 94, 0.16);
+            color: #15803d;
+        }
+
+        .status-icon-error {
+            background: rgba(239, 68, 68, 0.16);
+            color: #b91c1c;
+        }
+
+        .status-icon-paused {
+            background: rgba(245, 158, 11, 0.18);
+            color: #b45309;
+        }
+
+        .result-card {
+            background: var(--panel-strong);
+        }
+
+        .result-card-trained {
+            border-color: rgba(37, 99, 235, 0.3);
+            background: rgba(37, 99, 235, 0.08);
+        }
+
+        .result-card-skipped {
+            border-color: var(--line);
+            background: var(--panel-soft);
+        }
+
+        .result-card-total {
+            border-color: rgba(31, 157, 176, 0.3);
+            background: rgba(31, 157, 176, 0.08);
+        }
+
+        .result-value {
+            font-family: var(--font-mono);
+        }
+

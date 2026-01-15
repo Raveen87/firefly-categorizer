@@ -1,0 +1,49 @@
+    .panel {
+        margin-top: 24px;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 22px;
+        padding: 22px;
+        box-shadow: var(--shadow-soft);
+        backdrop-filter: blur(12px);
+        position: relative;
+    }
+
+    .panel::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 16px;
+        right: 16px;
+        height: 2px;
+        background: linear-gradient(90deg, rgba(31, 157, 176, 0.6), rgba(31, 157, 176, 0));
+        opacity: 0.8;
+    }
+
+    .panel-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        flex-wrap: wrap;
+    }
+
+    .panel-title {
+        font-size: 1.2rem;
+    }
+
+    .panel-subtitle {
+        color: var(--ink-soft);
+        font-size: 0.95rem;
+    }
+
+    .scope-indicator {
+        background: #0f172a;
+        color: #f8fafc;
+        padding: 6px 12px;
+        border-radius: 999px;
+        font-size: 0.7rem;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        font-family: var(--font-mono);
+    }

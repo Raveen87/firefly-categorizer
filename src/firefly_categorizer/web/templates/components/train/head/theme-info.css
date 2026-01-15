@@ -1,0 +1,46 @@
+        .training-page-title {
+            font-size: 1.6rem;
+            font-weight: 700;
+            color: var(--ink);
+            letter-spacing: 0.01em;
+        }
+
+        .training-info-panel {
+            border: 1px solid var(--line);
+            background: var(--panel);
+            box-shadow: var(--shadow);
+        }
+
+        .training-info-panel::before {
+            height: 3px;
+            background: linear-gradient(90deg, var(--accent), var(--accent-alt));
+        }
+
+        .training-info-summary {
+            background: rgba(31, 157, 176, 0.1);
+        }
+
+        .training-info-summary:focus-visible {
+            outline: 2px solid rgba(31, 157, 176, 0.5);
+            outline-offset: -2px;
+        }
+
+        .training-info-summary::after {
+            border-right-color: var(--accent-strong);
+            border-bottom-color: var(--accent-strong);
+        }
+
+        .info-summary-eyebrow {
+            color: var(--accent-strong);
+            font-family: var(--font-mono);
+        }
+
+        .info-summary-title {
+            color: var(--ink);
+            font-family: var(--font-sans);
+        }
+
+        .info-summary-subtitle {
+            color: var(--muted);
+        }
+

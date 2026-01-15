@@ -1,0 +1,16 @@
+        .progress-bar {
+            transition: width 0.3s ease-in-out;
+        }
+
+        .stage-pending {
+            opacity: 0.5;
+        }
+
+        .stage-active {
+            opacity: 1;
+        }
+
+        .stage-complete {
+            opacity: 1;
+        }
+
