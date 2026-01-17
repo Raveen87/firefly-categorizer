@@ -412,7 +412,7 @@
                 return 'light';
             }
 
-            const initialTheme = root.dataset.theme || getStoredTheme() || getPreferredTheme();
+            const initialTheme = getStoredTheme() || getPreferredTheme();
             applyTheme(initialTheme, false);
 
             toggle.addEventListener('click', () => {
