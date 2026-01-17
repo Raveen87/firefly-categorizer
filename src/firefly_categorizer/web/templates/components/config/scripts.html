@@ -1,0 +1,35 @@
+<script>
+    (function() {
+        const form = document.querySelector('.config-form');
+        if (!form) {
+            return;
+        }
+
+        const fields = Array.from(form.querySelectorAll('input, select, textarea'))
+            .filter((field) => !field.disabled);
+        const initialValues = new Map();
+        let isDirty = false;
+
+        fields.forEach((field) => {
+            initialValues.set(field, field.value);
+        });
+
+        function recomputeDirty() {
+            isDirty = fields.some((field) => field.value !== initialValues.get(field));
+        }
+
+        form.addEventListener('input', recomputeDirty);
+        form.addEventListener('change', recomputeDirty);
+        form.addEventListener('submit', () => {
+            isDirty = false;
+        });
+
+        window.addEventListener('beforeunload', (event) => {
+            if (!isDirty) {
+                return;
+            }
+            event.preventDefault();
+            event.returnValue = '';
+        });
+    })();
+</script>
