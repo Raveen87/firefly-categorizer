@@ -1,6 +1,6 @@
 import os
 
-from dotenv import load_dotenv
+from dotenv import find_dotenv, load_dotenv
 
 from firefly_categorizer.domain.tags import parse_tag_list
 from firefly_categorizer.logger import get_logger
@@ -8,15 +8,137 @@ from firefly_categorizer.logger import get_logger
 logger = get_logger(__name__)
 
 
-def load_environment() -> None:
+CONFIG_FILENAME = "config.yaml"
+
+_CONFIG_FILE_PATH: str | None = None
+_CONFIG_FILE_VALUES: dict[str, str] = {}
+_EXTERNAL_ENV_KEYS: set[str] = set()
+
+_CONFIG_KEYS = (
+    "LOG_LEVEL",
+    "FIREFLY_URL",
+    "FIREFLY_TOKEN",
+    "OPENAI_API_KEY",
+    "OPENAI_MODEL",
+    "OPENAI_BASE_URL",
+    "AUTO_APPROVE_THRESHOLD",
+    "TRAINING_PAGE_SIZE",
+    "MANUAL_TAGS",
+    "AUTO_APPROVE_TAGS",
+    "DATA_DIR",
+    "LOG_DIR",
+)
+
+
+def _resolve_dotenv_path() -> str | None:
     config_dir = os.getenv("CONFIG_DIR")
     if config_dir:
-        dotenv_path = os.path.join(config_dir, ".env")
-        loaded = load_dotenv(dotenv_path=dotenv_path)
-        if not loaded:
-            load_dotenv()
-    else:
-        load_dotenv()
+        candidate = os.path.join(config_dir, ".env")
+        if os.path.exists(candidate):
+            return candidate
+    resolved = find_dotenv(usecwd=True)
+    return resolved or None
+
+
+def _resolve_config_path() -> str:
+    config_dir = os.getenv("CONFIG_DIR")
+    if config_dir:
+        return os.path.join(config_dir, CONFIG_FILENAME)
+    cwd = os.getcwd()
+    candidate = os.path.join(cwd, "config", CONFIG_FILENAME)
+    if os.path.exists(candidate):
+        return candidate
+    return os.path.join(cwd, CONFIG_FILENAME)
+
+
+def _strip_inline_comment(raw_value: str) -> str:
+    in_single = False
+    in_double = False
+    escaped = False
+    for index, char in enumerate(raw_value):
+        if escaped:
+            escaped = False
+            continue
+        if char == "\\":
+            escaped = True
+            continue
+        if char == '"' and not in_single:
+            in_double = not in_double
+            continue
+        if char == "'" and not in_double:
+            in_single = not in_single
+            continue
+        if char == "#" and not in_single and not in_double:
+            return raw_value[:index].rstrip()
+    return raw_value
+
+
+def _unquote_value(raw_value: str) -> str:
+    if len(raw_value) < 2:
+        return raw_value
+    if raw_value[0] == raw_value[-1] == '"':
+        value = raw_value[1:-1]
+        return value.replace('\\"', '"').replace("\\\\", "\\")
+    if raw_value[0] == raw_value[-1] == "'":
+        value = raw_value[1:-1]
+        return value.replace("\\'", "'").replace("\\\\", "\\")
+    return raw_value
+
+
+def read_config_file(path: str | None) -> dict[str, str]:
+    if not path or not os.path.exists(path):
+        return {}
+
+    values: dict[str, str] = {}
+    with open(path, encoding="utf-8") as handle:
+        for line in handle:
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#"):
+                continue
+            if ":" not in stripped:
+                continue
+            key, raw_value = stripped.split(":", 1)
+            key = key.strip()
+            if not key:
+                continue
+            cleaned = _strip_inline_comment(raw_value).strip()
+            if not cleaned:
+                continue
+            value = _unquote_value(cleaned)
+            if value:
+                values[key] = value
+    return values
+
+
+def load_environment() -> None:
+    global _CONFIG_FILE_PATH
+    global _CONFIG_FILE_VALUES
+    global _EXTERNAL_ENV_KEYS
+
+    dotenv_path = _resolve_dotenv_path()
+    if dotenv_path:
+        load_dotenv(dotenv_path=dotenv_path, override=False)
+
+    _EXTERNAL_ENV_KEYS = set(os.environ.keys())
+
+    _CONFIG_FILE_PATH = _resolve_config_path()
+    _CONFIG_FILE_VALUES = read_config_file(_CONFIG_FILE_PATH)
+
+    for key in _CONFIG_KEYS:
+        if key not in os.environ and key in _CONFIG_FILE_VALUES:
+            os.environ[key] = _CONFIG_FILE_VALUES[key]
+
+
+def get_config_path() -> str | None:
+    return _CONFIG_FILE_PATH
+
+
+def get_config_file_values() -> dict[str, str]:
+    return dict(_CONFIG_FILE_VALUES)
+
+
+def is_env_override(name: str) -> bool:
+    return name in _EXTERNAL_ENV_KEYS
 
 
 def ensure_dir(path: str | None) -> None:

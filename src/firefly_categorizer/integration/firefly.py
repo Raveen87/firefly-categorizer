@@ -42,6 +42,17 @@ class FireflyClient:
             "Accept": "application/json",
         }
 
+    def refresh(self, base_url: str | None = None, token: str | None = None) -> None:
+        base_value = base_url if base_url is not None else os.getenv("FIREFLY_URL")
+        token_value = token if token is not None else os.getenv("FIREFLY_TOKEN")
+        self.base_url = base_value or None
+        self.token = token_value or None
+        self.headers = {
+            "Authorization": f"Bearer {self.token}",
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+        }
+
     async def _fetch_transactions_page(
         self,
         client: httpx.AsyncClient,

@@ -10,17 +10,25 @@ A hybrid transaction categorization service for Firefly III.
 
 ## Configuration
 
-1.  Copy `.env.example` to `.env`:
+You can configure settings via environment variables or the UI-backed `config/config.yaml` file.
+Environment variables take precedence and lock the corresponding field in the UI.
+
+### Option A: Environment variables
+1.  Copy `.env.example` to `.env`. The application automatically loads `.env` on startup:
     ```bash
     cp .env.example .env
     ```
-2.  Edit `.env` and set your credentials:
+2.  Set the following variables:
     *   `FIREFLY_URL`: The full URL to your Firefly III instance (e.g., `http://192.168.1.100:8080`).
     *   `FIREFLY_TOKEN`: Your Personal Access Token. Generate this in Firefly III under **Profile > OAuth / Personal Access Tokens > Create New Token**.
     *   `OPENAI_API_KEY`: (Optional) Your OpenAI API key if you want LLM fallback.
     *   `AUTO_APPROVE_THRESHOLD`: (Optional) Confidence threshold for auto-approval (0-1, 0 disables).
     *   `MANUAL_TAGS`: (Optional) Comma-separated tags to apply when you click Save.
     *   `AUTO_APPROVE_TAGS`: (Optional) Comma-separated tags to apply when auto-approval kicks in.
+
+### Option B: config.yaml
+1.  Open `config/config.yaml` and uncomment the settings you want to use.
+2.  Values in `config.yaml` only apply when the same environment variable (or `.env` entry) is not set.
 
 ## Running
 
@@ -43,7 +51,7 @@ A hybrid transaction categorization service for Firefly III.
 2.  Open `http://localhost:8000`.
 
 The `/app/data` volume persists learned categories/models. `/app/logs` stores log files and
-`/app/config` is where a container-local `.env` can live if you prefer to mount one.
+`/app/config` is where the container-local `config.yaml` lives.
 
 ## Integration
 *   **Webhooks**: Configure Firefly III to send webhooks to `http://<your-ip>:8000/webhook/firefly` (JSON format).

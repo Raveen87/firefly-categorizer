@@ -45,6 +45,28 @@ class CategorizerService:
             self.llm = None
             logger.warning("OPENAI_API_KEY not found. LLM classifier disabled.")
 
+    def refresh_llm(self) -> None:
+        self.classifiers = [
+            classifier
+            for classifier in self.classifiers
+            if not isinstance(classifier, LLMClassifier)
+        ]
+
+        api_key = os.getenv("OPENAI_API_KEY")
+        if api_key:
+            model = os.getenv("OPENAI_MODEL", "gpt-3.5-turbo")
+            base_url = os.getenv("OPENAI_BASE_URL")
+            self.llm = LLMClassifier(api_key=api_key, model=model, base_url=base_url)
+            self.classifiers.append(self.llm)
+            logger.info(
+                "LLM Classifier refreshed: model=%s, base_url=%s",
+                model,
+                base_url or "default",
+            )
+        else:
+            self.llm = None
+            logger.info("OPENAI_API_KEY not found. LLM classifier disabled.")
+
     def categorize(
         self, transaction: Transaction, valid_categories: list[str] | None = None
     ) -> CategorizationResult | None:

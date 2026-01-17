@@ -27,7 +27,7 @@ This file explains the repository layout, technical choices, and working convent
 - `tests/` is the pytest suite.
 - `data/` is an optional data directory (defaults to repo root via `DATA_DIR`).
 - `memory.json` and `tfidf.pkl` are persisted model artifacts when using the default `DATA_DIR`.
-- `.env` and `.env.example` are the runtime configuration files.
+- `config/config.yaml` and `.env.example` are the runtime configuration templates. `.env` is loaded at startup if present.
 
 ## Technical choices
 - Python 3.12+ with FastAPI + Uvicorn (`pyproject.toml`).
@@ -39,6 +39,6 @@ This file explains the repository layout, technical choices, and working convent
 - Container support via `Dockerfile` and `docker-compose.yml`.
 
 ## Environment configuration
-- `.env` is loaded by `src/firefly_categorizer/core/settings.py` and can be overridden via `CONFIG_DIR`.
+- `config.yaml` is loaded by `src/firefly_categorizer/core/settings.py` (via `CONFIG_DIR` when set). `.env` is loaded first and treated as explicit environment variables.
 - Common variables: `FIREFLY_URL`, `FIREFLY_TOKEN`, `OPENAI_API_KEY`, `OPENAI_MODEL`, `OPENAI_BASE_URL`,
   `AUTO_APPROVE_THRESHOLD`, `TRAINING_PAGE_SIZE`, `MANUAL_TAGS`, `AUTO_APPROVE_TAGS`, `DATA_DIR`, `LOG_DIR`.

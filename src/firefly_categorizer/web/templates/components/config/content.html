@@ -1,0 +1,110 @@
+<div class="page-shell">
+    <div class="config-hero">
+        <div class="config-hero-card">
+            <div class="config-hero-inner">
+                <div class="config-kicker">Configuration</div>
+                <h1 class="config-title">Tune the categorizer</h1>
+                <p class="config-subtitle">
+                    Manage application settings directly or lock them in with environment variables.
+                    When an environment variable is set, the matching field stays read-only here.
+                </p>
+                <div class="config-meta">
+                    <div class="config-meta-item">
+                        <div class="config-meta-label">Config File</div>
+                        <div class="config-meta-value">{{ config_path }}</div>
+                    </div>
+                    <div class="config-meta-item">
+                        <div class="config-meta-label">Env Overrides</div>
+                        <div class="config-meta-value">{{ env_override_count }} fields locked</div>
+                    </div>
+                    <div class="config-meta-item">
+                        <div class="config-meta-label">Apply Notes</div>
+                        <div class="config-meta-value">Some changes require a restart.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% if status %}
+        <div class="config-status config-status-success">{{ status }}</div>
+    {% endif %}
+    {% if errors and errors|length %}
+        <div class="config-status config-status-error">
+            Fix the highlighted fields and try again.
+        </div>
+    {% endif %}
+
+    <form method="post" class="config-form">
+        {% for section in sections %}
+            <section class="config-section">
+                <div class="config-section-header">
+                    <h2 class="config-section-title">{{ section.name }}</h2>
+                </div>
+                <div class="config-grid">
+                    {% for field in section.fields %}
+                        <div class="config-field {% if field.env_override %}is-locked{% endif %}">
+                            <div class="config-field-header">
+                                <label for="{{ field.key }}">{{ field.label }}</label>
+                                {% if field.restart_required %}
+                                    <span class="config-pill">Restart</span>
+                                {% endif %}
+                            </div>
+                            <div class="config-input">
+                                {% if field.options %}
+                                    <select
+                                        id="{{ field.key }}"
+                                        name="{{ field.key }}"
+                                        {% if field.disabled %}disabled{% endif %}
+                                    >
+                                        <option value="" {% if not field.value %}selected{% endif %}>Unset</option>
+                                        {% for option in field.options %}
+                                            <option value="{{ option }}" {% if option == field.value %}selected{% endif %}>
+                                                {{ option }}
+                                            </option>
+                                        {% endfor %}
+                                    </select>
+                                {% else %}
+                                    <input
+                                        id="{{ field.key }}"
+                                        name="{{ field.key }}"
+                                        type="{{ field.input_type }}"
+                                        value="{{ field.value }}"
+                                        placeholder="{{ field.placeholder }}"
+                                        {% if field.step %}step="{{ field.step }}"{% endif %}
+                                        {% if field.disabled %}disabled{% endif %}
+                                    />
+                                {% endif %}
+                                {% if field.env_override %}
+                                    <span
+                                        class="config-lock"
+                                        title="Set via environment variable {{ field.key }}. Remove it and restart to edit here."
+                                        aria-hidden="true"
+                                    >
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                                            <rect x="5" y="11" width="14" height="10" rx="2"></rect>
+                                        </svg>
+                                    </span>
+                                {% endif %}
+                            </div>
+                            <div class="config-help">{{ field.description }}</div>
+                            {% if field.env_override %}
+                                <div class="config-env">Locked by {{ field.key }}</div>
+                            {% endif %}
+                            {% if field.error %}
+                                <div class="config-error">{{ field.error }}</div>
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+                </div>
+            </section>
+        {% endfor %}
+        <div class="config-actions">
+            <button type="submit" class="config-submit">Save configuration</button>
+            <div class="config-note">
+                Connection and automation changes apply immediately. Storage and logging changes require a restart.
+            </div>
+        </div>
+    </form>
+</div>

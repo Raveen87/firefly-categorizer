@@ -1,0 +1,39 @@
+# Firefly Categorizer configuration
+# These settings only take effect when the same environment variable is not set.
+# Remove the leading "#" to enable a setting here.
+
+# Firefly III URL (no trailing slash)
+# FIREFLY_URL:
+
+# Firefly III Personal Access Token (Profile -> OAuth -> Personal Access Tokens)
+# FIREFLY_TOKEN:
+
+# OpenAI API Key (Optional, for LLM fallback)
+# OPENAI_API_KEY:
+
+# OpenAI Model (Optional, defaults to gpt-3.5-turbo)
+# OPENAI_MODEL:
+
+# OpenAI Base URL (Optional, for OpenAI-compatible APIs)
+# OPENAI_BASE_URL:
+
+# Auto-approve threshold (0-1, 0 disables)
+# AUTO_APPROVE_THRESHOLD:
+
+# Training page size (minimum 1)
+# TRAINING_PAGE_SIZE:
+
+# Tags to apply when saving manually (comma-separated)
+# MANUAL_TAGS:
+
+# Tags to apply when auto-approving (comma-separated)
+# AUTO_APPROVE_TAGS:
+
+# Data directory (memory.json, tfidf.pkl)
+# DATA_DIR:
+
+# Log directory (app.log)
+# LOG_DIR:
+
+# Log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+# LOG_LEVEL:
