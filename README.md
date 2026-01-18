@@ -37,6 +37,16 @@ Environment variables take precedence and lock the corresponding field in the UI
 
 ## Running
 
+To assure the same verison of `uv` is used locally as in production, `mise` is recommended.
+
+Initialize the project by running:
+
+```bash
+mise install
+```
+
+Without `mise`, `uv` must be installed manually before proceeding.
+
 1. Install dependencies:
 
     ```bash
@@ -70,20 +80,14 @@ The `/app/data` volume persists learned categories/models. `/app/logs` stores lo
 
 ## Development
 
-This project uses **Ruff** for linting and **ty** for type checking.
+This project uses **pytest** for tests, **ty** for type checking and **Ruff** for linting.
 
-### Linting
+### Testing
 
-To check for linting issues:
-
-```bash
-uv run ruff check .
-```
-
-To automatically fix issues:
+To run the test suite:
 
 ```bash
-uv run ruff check . --fix
+uv run pytest
 ```
 
 ### Type Checking
@@ -94,10 +98,16 @@ To run type checking:
 uv run ty check
 ```
 
-### Testing
+### Linting
 
-To run the test suite:
+To check for linting issues:
 
 ```bash
-uv run pytest
+uv run ruff check
+```
+
+To automatically fix issues:
+
+```bash
+uv run ruff check --fix
 ```

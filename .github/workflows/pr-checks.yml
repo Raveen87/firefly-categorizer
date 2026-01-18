@@ -1,0 +1,49 @@
+name: PR Checks
+
+on:
+  pull_request:
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Read uv version
+        id: uv-version
+        shell: bash
+        run: |
+          version=$(awk -F '"' '/^uv = "/ {print $2}' mise.toml)
+          if [ -z "$version" ]; then
+            echo "uv version not found in mise.toml" >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: ${{ steps.uv-version.outputs.version }}
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      - name: Install dependencies
+        run: uv sync --frozen --all-groups
+
+      - name: Run tests
+        run: uv run pytest
+
+      - name: Type check
+        run: uv run ty check
+
+      - name: Lint
+        run: uv run ruff check
+
+      - name: Build Docker image
+        run: docker build -t firefly-categorizer:pr .
