@@ -63,6 +63,7 @@ class FireflyClient:
         }
         self._client = client
         self._client_lock = asyncio.Lock()
+        self._cache_lock = asyncio.Lock()
         self._categories_cache: list[dict[str, Any]] | None = None
         self._categories_cache_expires_at = 0.0
         cache_ttl = categories_cache_ttl
@@ -110,6 +111,7 @@ class FireflyClient:
             return client
 
     def _get_cached_categories(self, *, allow_stale: bool = False) -> list[dict[str, Any]] | None:
+        """Internal method to check cache. Safe to call without lock for fast-path check."""
         if self._categories_cache is None or self._categories_cache_ttl <= 0:
             return None
         if allow_stale:
@@ -119,6 +121,7 @@ class FireflyClient:
         return self._categories_cache
 
     def _cache_categories(self, categories: list[dict[str, Any]]) -> None:
+        """Internal method to update cache. Must be called while holding _cache_lock."""
         if self._categories_cache_ttl <= 0:
             return
         self._categories_cache = categories
@@ -361,30 +364,45 @@ class FireflyClient:
             return []
 
         if use_cache:
-            cached = self._get_cached_categories()
-            if cached is not None:
-                return cached
-
-        client = await self._get_client()
-        try:
-            # Firefly API for categories
-            response = await client.get(
-                f"{self.base_url}/api/v1/categories",
-                headers=self.headers,
-            )
-            response.raise_for_status()
-            data = response.json()
-            categories = data.get("data", [])
-            if use_cache:
-                self._cache_categories(categories)
-            return categories
-        except Exception as exc:
-            logger.error("Error fetching categories: %s", exc)
-            if use_cache:
-                cached = self._get_cached_categories(allow_stale=True)
+            # Acquire lock for all cache operations to prevent race conditions
+            async with self._cache_lock:
+                # Check cache
+                cached = self._get_cached_categories()
                 if cached is not None:
                     return cached
-            return []
+
+                # Cache miss or expired - fetch from API
+                client = await self._get_client()
+                try:
+                    response = await client.get(
+                        f"{self.base_url}/api/v1/categories",
+                        headers=self.headers,
+                    )
+                    response.raise_for_status()
+                    data = response.json()
+                    categories = data.get("data", [])
+                    self._cache_categories(categories)
+                    return categories
+                except Exception as exc:
+                    logger.error("Error fetching categories: %s", exc)
+                    cached = self._get_cached_categories(allow_stale=True)
+                    if cached is not None:
+                        return cached
+                    return []
+        else:
+            # No caching - fetch directly
+            client = await self._get_client()
+            try:
+                response = await client.get(
+                    f"{self.base_url}/api/v1/categories",
+                    headers=self.headers,
+                )
+                response.raise_for_status()
+                data = response.json()
+                return data.get("data", [])
+            except Exception as exc:
+                logger.error("Error fetching categories: %s", exc)
+                return []
 
     async def get_transaction(self, transaction_id: str) -> dict[str, Any] | None:
         if not self.base_url or not self.token:
