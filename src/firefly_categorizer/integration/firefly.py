@@ -299,7 +299,6 @@ class FireflyClient:
         all_transactions = []
         page = 1
         total_count = 0
-        total_pages = 1
         sort_supported = True
 
         client = await self._get_client()
