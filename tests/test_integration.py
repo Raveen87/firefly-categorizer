@@ -228,7 +228,6 @@ async def test_firefly_categories_use_cache_false_does_not_populate_cache() -> N
     assert mock_client.get.call_count == 2
 
 
-
 @pytest.mark.anyio
 async def test_train_endpoint_chunking() -> None:
     """Test that the /train endpoint processes chunks."""
