@@ -41,8 +41,11 @@ def create_app() -> FastAPI:
         app.state.pipeline = pipeline
 
         logger.info("Services initialized.")
-        yield
-        logger.info("Service shutting down.")
+        try:
+            yield
+        finally:
+            await firefly.aclose()
+            logger.info("Service shutting down.")
 
     app = FastAPI(title="Firefly Categorizer", lifespan=lifespan)
 
