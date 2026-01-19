@@ -359,6 +359,16 @@ class FireflyClient:
             "total": total_count
         }
 
+    async def _fetch_categories_from_api(self, client: httpx.AsyncClient) -> list[dict]:
+        """Fetch categories from Firefly API."""
+        response = await client.get(
+            f"{self.base_url}/api/v1/categories",
+            headers=self.headers,
+        )
+        response.raise_for_status()
+        data = response.json()
+        return data.get("data", [])
+
     async def get_categories(self, *, use_cache: bool = True) -> list[dict]:
         if not self.base_url or not self.token:
             return []
@@ -374,13 +384,7 @@ class FireflyClient:
                 # Cache miss or expired - fetch from API
                 client = await self._get_client()
                 try:
-                    response = await client.get(
-                        f"{self.base_url}/api/v1/categories",
-                        headers=self.headers,
-                    )
-                    response.raise_for_status()
-                    data = response.json()
-                    categories = data.get("data", [])
+                    categories = await self._fetch_categories_from_api(client)
                     self._cache_categories(categories)
                     return categories
                 except Exception as exc:
@@ -393,13 +397,8 @@ class FireflyClient:
             # No caching - fetch directly
             client = await self._get_client()
             try:
-                response = await client.get(
-                    f"{self.base_url}/api/v1/categories",
-                    headers=self.headers,
-                )
-                response.raise_for_status()
-                data = response.json()
-                return data.get("data", [])
+                categories = await self._fetch_categories_from_api(client)
+                return categories
             except Exception as exc:
                 logger.error("Error fetching categories: %s", exc)
                 return []
