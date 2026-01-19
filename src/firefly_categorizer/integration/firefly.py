@@ -111,7 +111,7 @@ class FireflyClient:
             return client
 
     def _get_cached_categories(self, *, allow_stale: bool = False) -> list[dict[str, Any]] | None:
-        """Internal method to check cache. Safe to call without lock for fast-path check."""
+        """Internal method to check cache validity and return cached categories if valid."""
         if self._categories_cache is None or self._categories_cache_ttl <= 0:
             return None
         if allow_stale:
