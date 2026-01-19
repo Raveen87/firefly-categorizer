@@ -46,6 +46,17 @@ CONFIG_FIELDS: tuple[ConfigField, ...] = (
         sensitive=True,
     ),
     ConfigField(
+        key="FIREFLY_CATEGORIES_TTL",
+        label="Categories Cache TTL",
+        description="Seconds to cache category list from Firefly III. 0 disables caching.",
+        placeholder="60",
+        input_type="number",
+        category="Firefly III",
+        value_type="float",
+        min_value=0,
+        step=0.01,
+    ),
+    ConfigField(
         key="OPENAI_API_KEY",
         label="OpenAI API Key",
         description="API key used for optional LLM fallback.",
@@ -148,6 +159,9 @@ CONFIG_TEMPLATE = """# Firefly Categorizer configuration
 
 # Firefly III Personal Access Token (Profile -> OAuth -> Personal Access Tokens)
 # FIREFLY_TOKEN:
+
+# Cache TTL for category list (seconds, 0 disables caching)
+# FIREFLY_CATEGORIES_TTL:
 
 # OpenAI API Key (Optional, for LLM fallback)
 # OPENAI_API_KEY:
