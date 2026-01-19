@@ -54,7 +54,7 @@ CONFIG_FIELDS: tuple[ConfigField, ...] = (
         category="Firefly III",
         value_type="float",
         min_value=0,
-        step=1,
+        step=0.01,
     ),
     ConfigField(
         key="OPENAI_API_KEY",
