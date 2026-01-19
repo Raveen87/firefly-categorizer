@@ -1,3 +1,4 @@
+import asyncio
 import os
 from collections.abc import AsyncGenerator
 from datetime import datetime
@@ -61,6 +62,7 @@ class FireflyClient:
             "Accept": "application/json",
         }
         self._client = client
+        self._client_lock = asyncio.Lock()
         self._categories_cache: list[dict[str, Any]] | None = None
         self._categories_cache_expires_at = 0.0
         cache_ttl = categories_cache_ttl
@@ -93,9 +95,19 @@ class FireflyClient:
             await self._client.aclose()
 
     async def _get_client(self) -> httpx.AsyncClient:
-        if self._client is None or self._client.is_closed:
-            self._client = httpx.AsyncClient()
-        return self._client
+        # Fast path: client already exists and is open
+        client = self._client
+        if client is not None and not client.is_closed:
+            return client
+
+        # Slow path: create or recreate client with lock protection
+        async with self._client_lock:
+            # Double-check after acquiring lock to avoid creating multiple clients
+            client = self._client
+            if client is None or client.is_closed:
+                self._client = httpx.AsyncClient()
+                return self._client
+            return client
 
     def _get_cached_categories(self, *, allow_stale: bool = False) -> list[dict[str, Any]] | None:
         if self._categories_cache is None or self._categories_cache_ttl <= 0:
