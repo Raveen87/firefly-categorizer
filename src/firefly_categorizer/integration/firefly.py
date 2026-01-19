@@ -105,8 +105,8 @@ class FireflyClient:
             # Double-check after acquiring lock to avoid creating multiple clients
             client = self._client
             if client is None or client.is_closed:
-                self._client = httpx.AsyncClient()
-                return self._client
+                client = httpx.AsyncClient()
+                self._client = client
             return client
 
     def _get_cached_categories(self, *, allow_stale: bool = False) -> list[dict[str, Any]] | None:
