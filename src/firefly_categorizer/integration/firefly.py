@@ -12,6 +12,7 @@ from firefly_categorizer.logger import get_logger
 logger = get_logger(__name__)
 
 DEFAULT_CATEGORIES_CACHE_TTL_SECONDS = 60.0
+DEFAULT_HTTP_TIMEOUT_SECONDS = 60.0
 
 def _parse_env_float(name: str, default: float) -> float:
     raw = os.getenv(name)
@@ -53,6 +54,7 @@ class FireflyClient:
         token: str | None = None,
         client: httpx.AsyncClient | None = None,
         categories_cache_ttl: float | None = None,
+        http_timeout: float | None = None,
     ):
         self.base_url = base_url or os.getenv("FIREFLY_URL")
         self.token = token or os.getenv("FIREFLY_TOKEN")
@@ -72,6 +74,13 @@ class FireflyClient:
                 DEFAULT_CATEGORIES_CACHE_TTL_SECONDS,
             )
         self._categories_cache_ttl = max(0.0, cache_ttl)
+        timeout = http_timeout
+        if timeout is None:
+            timeout = _parse_env_float(
+                "FIREFLY_HTTP_TIMEOUT",
+                DEFAULT_HTTP_TIMEOUT_SECONDS,
+            )
+        self._http_timeout = max(0.0, timeout)
 
     def refresh(self, base_url: str | None = None, token: str | None = None) -> None:
         base_value = base_url if base_url is not None else os.getenv("FIREFLY_URL")
