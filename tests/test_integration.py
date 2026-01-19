@@ -161,6 +161,73 @@ async def test_firefly_categories_cache_stale_fallback_on_error() -> None:
     assert second == categories
     assert mock_client.get.call_count == 2
 
+
+@pytest.mark.anyio
+async def test_firefly_categories_use_cache_false_bypasses_cache() -> None:
+    """Verify that use_cache=False always fetches fresh data from the API."""
+    categories_first = [{"id": "1", "attributes": {"name": "Food"}}]
+    categories_second = [{"id": "2", "attributes": {"name": "Fuel"}}]
+
+    mock_client = AsyncMock()
+    mock_client.is_closed = False
+    mock_client.get = AsyncMock(
+        side_effect=[
+            _categories_response(categories_first),
+            _categories_response(categories_second),
+        ]
+    )
+
+    client = FireflyClient(
+        base_url="http://test",
+        token="token",
+        client=mock_client,
+        categories_cache_ttl=60,
+    )
+
+    # First call with use_cache=False
+    first = await client.get_categories(use_cache=False)
+    # Second call with use_cache=False should also fetch fresh data
+    second = await client.get_categories(use_cache=False)
+
+    assert first == categories_first
+    assert second == categories_second
+    # Both calls should have hit the API
+    assert mock_client.get.call_count == 2
+
+
+@pytest.mark.anyio
+async def test_firefly_categories_use_cache_false_does_not_populate_cache() -> None:
+    """Verify that use_cache=False does not populate the cache."""
+    categories_uncached = [{"id": "1", "attributes": {"name": "Food"}}]
+    categories_cached = [{"id": "2", "attributes": {"name": "Fuel"}}]
+
+    mock_client = AsyncMock()
+    mock_client.is_closed = False
+    mock_client.get = AsyncMock(
+        side_effect=[
+            _categories_response(categories_uncached),
+            _categories_response(categories_cached),
+        ]
+    )
+
+    client = FireflyClient(
+        base_url="http://test",
+        token="token",
+        client=mock_client,
+        categories_cache_ttl=60,
+    )
+
+    # First call with use_cache=False should not populate cache
+    first = await client.get_categories(use_cache=False)
+    # Second call with use_cache=True should fetch fresh because cache is empty
+    second = await client.get_categories(use_cache=True)
+
+    assert first == categories_uncached
+    assert second == categories_cached
+    # Both calls should have hit the API because first call didn't cache
+    assert mock_client.get.call_count == 2
+
+
 @pytest.mark.anyio
 async def test_train_endpoint_chunking() -> None:
     """Test that the /train endpoint processes chunks."""
