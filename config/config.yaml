@@ -8,6 +8,9 @@
 # Firefly III Personal Access Token (Profile -> OAuth -> Personal Access Tokens)
 # FIREFLY_TOKEN:
 
+# Cache TTL for category list (seconds, 0 disables caching)
+# FIREFLY_CATEGORIES_TTL:
+
 # OpenAI API Key (Optional, for LLM fallback)
 # OPENAI_API_KEY:
 
