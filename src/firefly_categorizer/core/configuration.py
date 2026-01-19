@@ -52,7 +52,7 @@ CONFIG_FIELDS: tuple[ConfigField, ...] = (
         placeholder="60",
         input_type="number",
         category="Firefly III",
-        value_type="int",
+        value_type="float",
         min_value=0,
         step=1,
     ),
