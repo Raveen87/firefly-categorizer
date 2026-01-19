@@ -95,6 +95,7 @@ class FireflyClient:
             await self._client.aclose()
 
     async def _get_client(self) -> httpx.AsyncClient:
+<<<<<<< HEAD
         # Fast path: client already exists and is open
         client = self._client
         if client is not None and not client.is_closed:
@@ -108,6 +109,11 @@ class FireflyClient:
                 client = httpx.AsyncClient()
                 self._client = client
             return client
+=======
+        if self._client is None or self._client.is_closed:
+            self._client = httpx.AsyncClient(timeout=60.0)
+        return self._client
+>>>>>>> 3d2cc87 (Add timeout configuration to _get_client method)
 
     def _get_cached_categories(self, *, allow_stale: bool = False) -> list[dict[str, Any]] | None:
         if self._categories_cache is None or self._categories_cache_ttl <= 0:
