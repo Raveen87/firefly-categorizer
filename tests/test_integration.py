@@ -227,3 +227,84 @@ async def test_train_endpoint_chunking() -> None:
     args2, _ = mock_service.learn.call_args_list[1]
     assert args2[0].description == "t2"
     assert args2[1].name == "C2"
+
+
+@pytest.mark.anyio
+async def test_firefly_aclose_closes_client() -> None:
+    """Test that aclose properly closes the HTTP client."""
+    mock_client = AsyncMock()
+    mock_client.is_closed = False
+    mock_client.aclose = AsyncMock()
+
+    client = FireflyClient(
+        base_url="http://test",
+        token="token",
+        client=mock_client,
+    )
+
+    await client.aclose()
+
+    # Verify that aclose was called on the HTTP client
+    mock_client.aclose.assert_awaited_once()
+
+
+@pytest.mark.anyio
+async def test_firefly_aclose_handles_already_closed_client() -> None:
+    """Test that aclose handles an already-closed client gracefully."""
+    mock_client = AsyncMock()
+    mock_client.is_closed = True
+    mock_client.aclose = AsyncMock()
+
+    client = FireflyClient(
+        base_url="http://test",
+        token="token",
+        client=mock_client,
+    )
+
+    # Should not raise an error
+    await client.aclose()
+
+    # Should not call aclose on an already-closed client
+    mock_client.aclose.assert_not_awaited()
+
+
+@pytest.mark.anyio
+async def test_firefly_aclose_handles_no_client() -> None:
+    """Test that aclose handles the case when no client has been created."""
+    client = FireflyClient(
+        base_url="http://test",
+        token="token",
+    )
+
+    # Should not raise an error when client is None
+    await client.aclose()
+
+
+@pytest.mark.anyio
+async def test_firefly_aclose_prevents_resource_leaks() -> None:
+    """Test that aclose prevents resource leaks by verifying client is closed after use."""
+    mock_client = AsyncMock()
+    mock_client.is_closed = False
+    mock_client.aclose = AsyncMock()
+    mock_client.get = AsyncMock()
+
+    # Setup a successful categories response
+    mock_response = MagicMock()
+    mock_response.raise_for_status.return_value = None
+    mock_response.json.return_value = {"data": [{"id": "1", "attributes": {"name": "Food"}}]}
+    mock_client.get.return_value = mock_response
+
+    client = FireflyClient(
+        base_url="http://test",
+        token="token",
+        client=mock_client,
+    )
+
+    # Use the client
+    await client.get_categories()
+
+    # Close the client
+    await client.aclose()
+
+    # Verify the client was closed
+    mock_client.aclose.assert_awaited_once()
