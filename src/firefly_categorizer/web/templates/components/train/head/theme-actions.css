@@ -1,6 +1,7 @@
         .training-actions {
-            border: 1px dashed rgba(31, 157, 176, 0.25);
-            background: rgba(255, 255, 255, 0.75);
+            border: 1px solid var(--line);
+            background: linear-gradient(150deg, var(--panel-strong) 0%, var(--panel-soft) 100%);
+            box-shadow: var(--shadow-soft);
         }
 
         .training-action {
