@@ -111,3 +111,12 @@ To automatically fix issues:
 ```bash
 uv run ruff check --fix
 ```
+
+## Release
+
+Releases are created via the GitHub Actions **Release** workflow. It bumps the version, generates
+the changelog, builds and pushes the Docker image, tags the release, and creates a **draft** GitHub
+Release for manual editing.
+
+Note: if a draft release is deleted manually, the Git tag remains in the repository. If you need
+to undo a release after deleting the draft, delete the tag separately in Git.
