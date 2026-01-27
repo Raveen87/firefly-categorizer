@@ -8,12 +8,12 @@ class ColourizedFormatter(logging.Formatter):
     Custom formatter to add colors to log levels.
     """
     # ANSI escape codes
-    GREY = "\x1b[38;20m"
-    GREEN = "\x1b[32;20m"
-    YELLOW = "\x1b[33;20m"
-    RED = "\x1b[31;20m"
-    BOLD_RED = "\x1b[31;1m"
-    RESET = "\x1b[0m"
+    GREY = "\x1b[90m"        # Bright black (grey)
+    GREEN = "\x1b[32m"       # Green
+    YELLOW = "\x1b[33m"      # Yellow
+    RED = "\x1b[31m"         # Red
+    BOLD_RED = "\x1b[31;1m"  # Bold red
+    RESET = "\x1b[0m"        # Reset
 
     LEVEL_COLORS = {
         logging.DEBUG: GREY,

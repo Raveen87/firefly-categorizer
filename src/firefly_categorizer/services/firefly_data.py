@@ -1,6 +1,9 @@
 from datetime import datetime, timedelta
 
 from firefly_categorizer.integration.firefly import FireflyClient
+from firefly_categorizer.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 def is_all_scope(scope: str | None) -> bool:
@@ -32,7 +35,15 @@ async def fetch_category_names(
     firefly: FireflyClient,
     *,
     sort: bool = False,
+    raise_on_error: bool = False,
 ) -> list[str]:
-    raw_cats = await firefly.get_categories()
+    raw_cats = await firefly.get_categories(raise_on_error=raise_on_error)
     categories = [c["attributes"]["name"] for c in raw_cats] if raw_cats else []
-    return sorted(categories) if sort else categories
+    result = sorted(categories) if sort else categories
+    logger.debug(
+        "[CATEGORIES] Processed %d category names%s: %s",
+        len(result),
+        " (sorted)" if sort else "",
+        ", ".join(result) if result else "(none)",
+    )
+    return result

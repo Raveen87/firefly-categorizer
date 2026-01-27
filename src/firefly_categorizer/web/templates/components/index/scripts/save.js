@@ -41,13 +41,31 @@
 
                 if (response.ok) {
                     const row = selectEl.closest('tr');
-                    row.className = 'table-row is-categorized';
+                    row.className = 'table-row is-categorized is-processed';
+
+                    const dateCell = row.cells[0];
+                    if (dateCell && !dateCell.querySelector('.processed-indicator')) {
+                        const indicator = document.createElement('span');
+                        indicator.className = 'processed-indicator tooltip';
+                        indicator.setAttribute('data-tooltip', 'Already processed');
+                        indicator.setAttribute('aria-label', 'Already processed');
+                        indicator.setAttribute('role', 'img');
+                        indicator.textContent = '✓';
+                        dateCell.prepend(indicator);
+                    }
 
                     const catCell = row.cells[3];
-                    catCell.innerHTML = `<span class="font-semibold">${categoryName}</span> <span class="tag">Saved</span>`;
+                    catCell.textContent = '';
+                    const categorySpan = document.createElement('span');
+                    categorySpan.className = 'font-semibold';
+                    categorySpan.textContent = categoryName;
+                    const savedSpan = document.createElement('span');
+                    savedSpan.className = 'tag';
+                    savedSpan.textContent = 'Saved';
+                    catCell.append(categorySpan, document.createTextNode(' '), savedSpan);
 
                     const confCell = row.cells[4];
-                    confCell.innerHTML = '-';
+                    confCell.textContent = '-';
 
                     btn.remove();
                     selectEl.disabled = true;
