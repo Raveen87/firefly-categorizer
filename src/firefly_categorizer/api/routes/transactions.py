@@ -50,7 +50,7 @@ async def categorize_stream(
                 limit=limit,
             )
         except Exception as exc:
-            yield f"data: {json.dumps({'error': f'Error fetching transactions: {repr(exc)}'})}\n\n"
+            yield f"data: {json.dumps({'error': f'Error fetching transactions: {exc!r}'})}\n\n"
             return
 
         raw_txs = result.get("data", [])
