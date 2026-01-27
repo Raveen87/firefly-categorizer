@@ -137,6 +137,11 @@ class CategorizationPipeline:
         auto_approved = False
 
         if not existing_cat:
+            tx_id_log = snapshot.transaction_id if snapshot.transaction_id is not None else "unknown"
+            logger.debug(
+                "[PREDICT] Starting categorization for transaction ID: %s",
+                tx_id_log,
+            )
             prediction = await self.predict(
                 snapshot.transaction,
                 valid_categories=valid_categories,

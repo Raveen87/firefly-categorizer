@@ -41,7 +41,18 @@
 
                 if (response.ok) {
                     const row = selectEl.closest('tr');
-                    row.className = 'table-row is-categorized';
+                    row.className = 'table-row is-categorized is-processed';
+
+                    const dateCell = row.cells[0];
+                    if (dateCell && !dateCell.querySelector('.processed-indicator')) {
+                        const indicator = document.createElement('span');
+                        indicator.className = 'processed-indicator tooltip';
+                        indicator.setAttribute('data-tooltip', 'Already processed');
+                        indicator.setAttribute('aria-label', 'Already processed');
+                        indicator.setAttribute('role', 'img');
+                        indicator.textContent = '✓';
+                        dateCell.prepend(indicator);
+                    }
 
                     const catCell = row.cells[3];
                     catCell.innerHTML = `<span class="font-semibold">${categoryName}</span> <span class="tag">Saved</span>`;

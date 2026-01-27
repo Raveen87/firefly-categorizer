@@ -9,7 +9,7 @@ from fastapi.templating import Jinja2Templates
 from firefly_categorizer.api.dependencies import get_firefly_optional
 from firefly_categorizer.core import configuration
 from firefly_categorizer.integration.firefly import FireflyClient
-from firefly_categorizer.services.firefly_data import fetch_category_names, is_all_scope
+from firefly_categorizer.services.firefly_data import is_all_scope
 
 router = APIRouter()
 
@@ -27,10 +27,6 @@ async def index(
     end_date: str | None = None,
     scope: str | None = None,
 ) -> HTMLResponse:
-    category_list = []
-    if firefly:
-        category_list = await fetch_category_names(firefly, sort=True)
-
     if not start_date:
         start_date = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d")
     if not end_date:
@@ -42,7 +38,7 @@ async def index(
         "index.html",
         {
             "request": request,
-            "categories": category_list,
+            "categories": [],
             "start_date": start_date,
             "end_date": end_date,
             "scope": scope_mode,

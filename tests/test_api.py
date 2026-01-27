@@ -111,3 +111,14 @@ def test_get_transactions_with_predict(
     mock_service.categorize.assert_called_once()
     assert data["transactions"][0]["prediction"] is not None
     assert data["transactions"][0]["prediction"]["category"]["name"] == "Food"
+
+
+def test_get_categories(mock_firefly: AsyncMock) -> None:
+    mock_firefly.get_categories.return_value = [
+        {"attributes": {"name": "Food"}},
+        {"attributes": {"name": "Rent"}}
+    ]
+
+    response = client.get("/api/categories")
+    assert response.status_code == 200
+    assert response.json() == ["Food", "Rent"]

@@ -69,6 +69,7 @@ async def firefly_webhook(
     if not valid_categories:
         valid_categories = None
 
+    logger.debug("[WEBHOOK] Starting categorization for transaction ID: %s", tx_id)
     prediction = await pipeline.predict(
         tx_obj,
         valid_categories=valid_categories,
