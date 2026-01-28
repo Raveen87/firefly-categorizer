@@ -38,10 +38,30 @@
         transform: translateY(-1px);
     }
 
+    .btn-danger {
+        background: var(--accent-danger);
+        color: #fff;
+        box-shadow: 0 10px 20px rgba(239, 68, 68, 0.25);
+    }
+
+    .btn-danger:hover {
+        background: #dc2626;
+        transform: translateY(-1px);
+    }
+
     .btn-ghost {
         background: var(--panel-strong);
         color: var(--ink);
         border: 1px solid var(--line);
+    }
+
+    .btn:disabled,
+    .btn[disabled] {
+        opacity: 0.6;
+        cursor: not-allowed;
+        pointer-events: none;
+        box-shadow: none;
+        transform: none !important;
     }
 
     .btn-disabled {

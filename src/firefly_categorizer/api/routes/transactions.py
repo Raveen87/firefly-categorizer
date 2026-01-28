@@ -2,7 +2,7 @@ import asyncio
 import json
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 
 from firefly_categorizer.api.dependencies import (
@@ -42,12 +42,16 @@ async def categorize_stream(
 
         start_date_obj, end_date_obj = resolve_date_range(start_date, end_date, scope)
 
-        result = await firefly.get_transactions(
-            start_date=start_date_obj,
-            end_date=end_date_obj,
-            page=page,
-            limit=limit,
-        )
+        try:
+            result = await firefly.get_transactions(
+                start_date=start_date_obj,
+                end_date=end_date_obj,
+                page=page,
+                limit=limit,
+            )
+        except Exception as exc:
+            yield f"data: {json.dumps({'error': f'Error fetching transactions: {exc!r}'})}\n\n"
+            return
 
         raw_txs = result.get("data", [])
 
@@ -100,12 +104,18 @@ async def get_transactions(
 
         start_date_obj, end_date_obj = resolve_date_range(start_date, end_date, scope)
 
-        result = await firefly.get_transactions(
-            start_date=start_date_obj,
-            end_date=end_date_obj,
-            page=page,
-            limit=limit,
-        )
+        try:
+            result = await firefly.get_transactions(
+                start_date=start_date_obj,
+                end_date=end_date_obj,
+                page=page,
+                limit=limit,
+            )
+        except Exception as exc:
+            raise HTTPException(
+                status_code=502,
+                detail=f"Error communicating with Firefly: {exc!r}",
+            ) from exc
 
         raw_txs = result.get("data", [])
         pagination = result.get("meta", {})
@@ -141,3 +151,19 @@ async def get_transactions(
         "transactions": transactions_display,
         "pagination": pagination,
     }
+
+
+@router.get("/api/categories")
+async def get_categories(
+    firefly: Annotated[FireflyClient | None, Depends(get_firefly_optional)],
+) -> list[str]:
+    if not firefly:
+        return []
+
+    try:
+        return await fetch_category_names(firefly, sort=True, raise_on_error=True)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Error fetching categories: {exc!r}",
+        ) from exc

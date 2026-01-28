@@ -81,6 +81,7 @@ class FireflyClient:
                 DEFAULT_HTTP_TIMEOUT_SECONDS,
             )
         self._http_timeout = max(0.0, timeout)
+        logger.info("[INIT] FireflyClient initialized with timeout=%.2fs", self._http_timeout)
 
     def refresh(self, base_url: str | None = None, token: str | None = None) -> None:
         base_value = base_url if base_url is not None else os.getenv("FIREFLY_URL")
@@ -114,7 +115,7 @@ class FireflyClient:
             # Double-check after acquiring lock to avoid creating multiple clients
             client = self._client
             if client is None or client.is_closed:
-                client = httpx.AsyncClient()
+                client = httpx.AsyncClient(timeout=self._http_timeout)
                 self._client = client
             return client
 
@@ -140,7 +141,6 @@ class FireflyClient:
         page: int,
         limit: int,
         sort_supported: bool,
-        timeout: float | None = 60.0,
     ) -> tuple[list[dict[str, Any]], dict[str, Any], bool]:
         params: dict[str, Any] = {
             "limit": limit,
@@ -150,11 +150,20 @@ class FireflyClient:
             params["sort"] = "created_at"
             params["order"] = "asc"
 
+        logger.debug(
+            "[FIREFLY] Sending paged transactions request: %s params=%s",
+            f"{self.base_url}/api/v1/transactions",
+            params,
+        )
+        started = monotonic()
         response = await client.get(
             f"{self.base_url}/api/v1/transactions",
             headers=self.headers,
             params=params,
-            timeout=timeout,
+        )
+        logger.debug(
+            "[FIREFLY] Paged transactions response headers received in %.2fs",
+            monotonic() - started,
         )
         try:
             response.raise_for_status()
@@ -170,7 +179,6 @@ class FireflyClient:
                     f"{self.base_url}/api/v1/transactions",
                     headers=self.headers,
                     params=params,
-                    timeout=timeout,
                 )
                 response.raise_for_status()
             else:
@@ -204,10 +212,20 @@ class FireflyClient:
             if end_date:
                 params["end"] = end_date.strftime("%Y-%m-%d")
 
+            logger.debug(
+                "[FIREFLY] Sending transactions request: %s params=%s",
+                f"{self.base_url}/api/v1/transactions",
+                params,
+            )
+            started = monotonic()
             response = await client.get(
                 f"{self.base_url}/api/v1/transactions",
                 headers=self.headers,
                 params=params,
+            )
+            logger.debug(
+                "[FIREFLY] Transactions response headers received in %.2fs",
+                monotonic() - started,
             )
             response.raise_for_status()
             data = response.json()
@@ -216,8 +234,8 @@ class FireflyClient:
                 "meta": data.get("meta", {}).get("pagination", {})
             }
         except Exception as exc:
-            logger.error("Error fetching transactions: %s", exc)
-            return {"data": [], "meta": {}}
+            logger.error("Error fetching transactions: %r", exc)
+            raise
 
     async def get_all_transactions(self, limit_per_page: int = 500) -> dict:
         """Fetch all transactions with pagination. Returns dict with transactions and metadata."""
@@ -365,7 +383,7 @@ class FireflyClient:
             "total": total_count
         }
 
-    async def get_categories(self, *, use_cache: bool = True) -> list[dict]:
+    async def get_categories(self, *, use_cache: bool = True, raise_on_error: bool = False) -> list[dict]:
         if not self.base_url or not self.token:
             return []
 
@@ -384,11 +402,23 @@ class FireflyClient:
             response.raise_for_status()
             data = response.json()
             categories = data.get("data", [])
+            category_names = [
+                c.get("attributes", {}).get("name")
+                for c in categories
+                if c.get("attributes", {}).get("name")
+            ]
+            logger.debug(
+                "[FIREFLY] Received %d categories from Firefly: %s",
+                len(category_names),
+                ", ".join(category_names) if category_names else "(none)",
+            )
             if use_cache:
                 self._cache_categories(categories)
             return categories
         except Exception as exc:
-            logger.error("Error fetching categories: %s", exc)
+            logger.error("Error fetching categories: %r", exc)
+            if raise_on_error:
+                raise
             if use_cache:
                 cached = self._get_cached_categories(allow_stale=True)
                 if cached is not None:

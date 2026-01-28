@@ -47,7 +47,7 @@
         border-radius: 10px;
         background: rgba(15, 23, 42, 0.08);
         border: 1px solid rgba(15, 23, 42, 0.08);
-        color: var(--ink-soft);
+        color: var(--scope-strip-ink);
         font-size: 0.75rem;
         letter-spacing: 0.02em;
     }
@@ -55,7 +55,7 @@
     .scope-strip.is-all {
         background: rgba(31, 157, 176, 0.18);
         border-color: rgba(31, 157, 176, 0.45);
-        color: #0f172a;
+        color: var(--scope-strip-ink-strong);
     }
 
     .field-group input,

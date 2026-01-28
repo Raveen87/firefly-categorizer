@@ -111,3 +111,43 @@ def test_get_transactions_with_predict(
     mock_service.categorize.assert_called_once()
     assert data["transactions"][0]["prediction"] is not None
     assert data["transactions"][0]["prediction"]["category"]["name"] == "Food"
+
+
+def test_get_categories(mock_firefly: AsyncMock) -> None:
+    mock_firefly.get_categories.return_value = [
+        {"attributes": {"name": "Food"}},
+        {"attributes": {"name": "Rent"}}
+    ]
+
+    response = client.get("/api/categories")
+    assert response.status_code == 200
+    assert response.json() == ["Food", "Rent"]
+
+def test_get_categories_error(mock_firefly: AsyncMock) -> None:
+    mock_firefly.get_categories.side_effect = Exception("Firefly error")
+
+    response = client.get("/api/categories")
+    assert response.status_code == 502
+    assert "Firefly error" in response.json()["detail"]
+
+def test_get_categories_no_firefly() -> None:
+    had_firefly = hasattr(app.state, "firefly")
+    original_firefly = getattr(app.state, "firefly", None)
+    # Ensure firefly is NOT in app.state
+    if had_firefly:
+        delattr(app.state, "firefly")
+
+    try:
+        response = client.get("/api/categories")
+        assert response.status_code == 200
+        assert response.json() == []
+    finally:
+        if had_firefly:
+            app.state.firefly = original_firefly
+
+def test_get_categories_empty(mock_firefly: AsyncMock) -> None:
+    mock_firefly.get_categories.return_value = []
+
+    response = client.get("/api/categories")
+    assert response.status_code == 200
+    assert response.json() == []

@@ -7,40 +7,40 @@ from firefly_categorizer.services.training import TrainingManager
 
 
 def get_service(request: Request) -> CategorizerService:
-    service = request.app.state.service
+    service = getattr(request.app.state, "service", None)
     if not service:
         raise HTTPException(status_code=500, detail="Service not initialized")
     return service
 
 
 def get_service_optional(request: Request) -> CategorizerService | None:
-    return request.app.state.service
+    return getattr(request.app.state, "service", None)
 
 
 def get_firefly_optional(request: Request) -> FireflyClient | None:
-    return request.app.state.firefly
+    return getattr(request.app.state, "firefly", None)
 
 
 def get_firefly(request: Request) -> FireflyClient:
-    firefly = request.app.state.firefly
+    firefly = getattr(request.app.state, "firefly", None)
     if not firefly:
         raise HTTPException(status_code=500, detail="Firefly not configured")
     return firefly
 
 
 def get_training_manager(request: Request) -> TrainingManager:
-    manager = request.app.state.training_manager
+    manager = getattr(request.app.state, "training_manager", None)
     if not manager:
         raise HTTPException(status_code=500, detail="Service not initialized")
     return manager
 
 
 def get_pipeline(request: Request) -> CategorizationPipeline:
-    pipeline = request.app.state.pipeline
+    pipeline = getattr(request.app.state, "pipeline", None)
     if not pipeline:
         raise HTTPException(status_code=500, detail="Service not initialized")
     return pipeline
 
 
 def get_pipeline_optional(request: Request) -> CategorizationPipeline | None:
-    return request.app.state.pipeline
+    return getattr(request.app.state, "pipeline", None)
