@@ -5,6 +5,7 @@ const state = {
     itemsPerPage: 50,
     totalPages: 1,
     totalTransactions: 0,
-    renderScheduled: false
+    renderScheduled: false,
+    isCategorizing: false
 };
 const dom = {};

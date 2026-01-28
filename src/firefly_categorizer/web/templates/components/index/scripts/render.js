@@ -72,9 +72,10 @@ function renderTransactions() {
         const processedIndicator = isProcessed
             ? '<span class="processed-indicator tooltip" data-tooltip="Already processed" aria-label="Already processed" role="img">✓</span>'
             : '';
+        const dateMarkup = `<span>${t.date_formatted}</span>`;
 
         row.innerHTML = `
-                    <td>${processedIndicator}<span>${t.date_formatted}</span></td>
+                    <td>${processedIndicator}${dateMarkup}</td>
                     <td>${t.description}</td>
                     <td>${t.amount} ${t.currency}</td>
                     <td>${categoryDisplay}</td>

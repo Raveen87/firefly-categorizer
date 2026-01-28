@@ -81,7 +81,7 @@ async function fetchCategories() {
         CATEGORIES = await response.json();
 
         // Re-render if we have transactions, to update dropdowns
-        if (state.transactions && state.transactions.length > 0) {
+        if (state.transactions && state.transactions.length > 0 && !state.isCategorizing) {
             renderTransactions();
         }
 

@@ -23,7 +23,11 @@ function runCategorization() {
     // Start state
     dom.categorizeBtn.textContent = 'Stop';
     dom.categorizeBtn.classList.remove('btn-secondary');
-    dom.categorizeBtn.classList.add('btn-danger'); // Assuming btn-danger exists or will style it
+    dom.categorizeBtn.classList.add('btn-danger');
+
+    state.isCategorizing = true;
+
+    if (dom.errorAlert) dom.errorAlert.classList.add('hidden');
 
     toggleControls(true);
 
@@ -38,7 +42,14 @@ function runCategorization() {
 
         if (data.error) {
             console.error('Categorization error:', data.error);
-            alert('Error during categorization: ' + data.error);
+            if (dom.errorAlert && dom.errorText) {
+                dom.errorText.textContent = `Error during categorization: ${data.error}`;
+                dom.errorAlert.classList.remove('hidden');
+            } else if (dom.noData) {
+                dom.noData.textContent = `Error during categorization: ${data.error}`;
+                dom.noData.classList.add('text-danger');
+                dom.noData.classList.remove('hidden');
+            }
             // Use cleanup on error to reset UI
             if (categorizationSource) {
                 categorizationSource.close();
@@ -84,6 +95,7 @@ function runCategorization() {
 
 function cleanupCategorization() {
     categorizationSource = null;
+    state.isCategorizing = false;
     dom.loadingState.classList.add('hidden');
 
     // Reset button

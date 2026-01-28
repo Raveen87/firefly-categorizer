@@ -55,10 +55,17 @@
                     }
 
                     const catCell = row.cells[3];
-                    catCell.innerHTML = `<span class="font-semibold">${categoryName}</span> <span class="tag">Saved</span>`;
+                    catCell.textContent = '';
+                    const categorySpan = document.createElement('span');
+                    categorySpan.className = 'font-semibold';
+                    categorySpan.textContent = categoryName;
+                    const savedSpan = document.createElement('span');
+                    savedSpan.className = 'tag';
+                    savedSpan.textContent = 'Saved';
+                    catCell.append(categorySpan, document.createTextNode(' '), savedSpan);
 
                     const confCell = row.cells[4];
-                    confCell.innerHTML = '-';
+                    confCell.textContent = '-';
 
                     btn.remove();
                     selectEl.disabled = true;

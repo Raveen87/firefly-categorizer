@@ -131,13 +131,19 @@ def test_get_categories_error(mock_firefly: AsyncMock) -> None:
     assert "Firefly error" in response.json()["detail"]
 
 def test_get_categories_no_firefly() -> None:
+    had_firefly = hasattr(app.state, "firefly")
+    original_firefly = getattr(app.state, "firefly", None)
     # Ensure firefly is NOT in app.state
-    if hasattr(app.state, "firefly"):
+    if had_firefly:
         delattr(app.state, "firefly")
 
-    response = client.get("/api/categories")
-    assert response.status_code == 200
-    assert response.json() == []
+    try:
+        response = client.get("/api/categories")
+        assert response.status_code == 200
+        assert response.json() == []
+    finally:
+        if had_firefly:
+            app.state.firefly = original_firefly
 
 def test_get_categories_empty(mock_firefly: AsyncMock) -> None:
     mock_firefly.get_categories.return_value = []
