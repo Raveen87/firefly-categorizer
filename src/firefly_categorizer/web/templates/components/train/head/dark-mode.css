@@ -25,3 +25,18 @@
             border-left-color: rgba(2, 6, 23, 0.45);
         }
 
+        :root[data-theme="dark"] .training-action-warning {
+            color: #fef3c7;
+        }
+
+        :root[data-theme="dark"] .training-action-warning svg {
+            color: inherit;
+        }
+
+        :root[data-theme="dark"] .training-action-danger {
+            color: #fecaca;
+        }
+
+        :root[data-theme="dark"] .training-action-danger svg {
+            color: inherit;
+        }
