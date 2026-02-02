@@ -3,7 +3,8 @@
         <span class="help-kicker">Setup</span>
         <div class="help-section-title-row">
             <span class="help-section-icon help-icon-setup">
-                <svg aria-hidden="true" viewBox="0 0 24 24" class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2">
+                <svg aria-hidden="true" viewBox="0 0 24 24" class="w-5 h-5" fill="none" stroke="currentColor"
+                    stroke-width="2">
                     <path d="M4 7h8"></path>
                     <path d="M16 7h4"></path>
                     <path d="M4 17h4"></path>
@@ -22,7 +23,8 @@
             <div class="feature-title">Auto-Approve</div>
             <p class="feature-copy">
                 You can set an <code>AUTO_APPROVE_THRESHOLD</code> (e.g., 0.9) in your <code>config.yaml</code> file.
-                If the system is confident enough in its prediction, it will automatically update Firefly III without waiting for your confirmation.
+                If the system is confident enough in its prediction, it will automatically update Firefly III without
+                waiting for your confirmation.
             </p>
         </article>
 
@@ -30,8 +32,28 @@
             <div class="feature-title">Webhooks</div>
             <p class="feature-copy">
                 The application can listen for real-time events from Firefly III.
-                If you configure a webhook in Firefly to point here, new transactions can be categorized instantly as they are created.
+                If you configure a webhook in Firefly to point here, new transactions can be categorized instantly as
+                they are created.
             </p>
+            <div class="webhook-body mt-4">
+                <div class="webhook-url-row">
+                    <input id="webhook-url" class="webhook-url" type="text" readonly aria-label="Firefly webhook URL"
+                        value="">
+                    <button id="webhook-copy-btn" type="button" class="webhook-copy" onclick="copyWebhookUrl()">
+                        <svg aria-hidden="true" viewBox="0 0 24 24" class="w-4 h-4" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <rect x="9" y="9" width="11" height="11" rx="2"></rect>
+                            <rect x="4" y="4" width="11" height="11" rx="2"></rect>
+                        </svg>
+                        <span>Copy URL</span>
+                    </button>
+                </div>
+                <div id="webhook-copy-status" class="webhook-status" role="status" aria-live="polite"></div>
+                <div class="webhook-note">
+                    <strong>Note:</strong> If you are running in Docker or on a remote server, you may need to replace
+                    the IP address with your server's actual IP address with network access.
+                </div>
+                </div>
         </article>
     </div>
 </section>

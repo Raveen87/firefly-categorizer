@@ -1,0 +1,85 @@
+<script>
+    function buildWebhookUrl() {
+        const currentUrl = new URL(window.location.href);
+        let basePath = currentUrl.pathname.replace(/\/help\/?$/, "");
+        if (basePath.endsWith("/")) {
+            basePath = basePath.slice(0, -1);
+        }
+        currentUrl.pathname = `${basePath}/webhook/firefly`;
+        currentUrl.search = "";
+        currentUrl.hash = "";
+        return currentUrl.toString();
+    }
+
+    function setWebhookStatus(message, state) {
+        const status = document.getElementById('webhook-copy-status');
+        const btn = document.getElementById('webhook-copy-btn');
+        const btnSpan = btn?.querySelector('span');
+
+        if (!status) return;
+
+        // Reset previous state classes
+        status.classList.remove('webhook-status-success', 'webhook-status-error');
+
+        if (state === 'success') {
+            status.textContent = message;
+            status.classList.add('webhook-status-success');
+
+            // Temporary button feedback
+            if (btn && btnSpan) {
+                const originalText = btnSpan.textContent;
+                btnSpan.textContent = "Copied!";
+                btn.classList.add('webhook-copy-success');
+                setTimeout(() => {
+                    btnSpan.textContent = originalText;
+                    btn.classList.remove('webhook-copy-success');
+                    // Optional: clear status after a few seconds
+                    // status.textContent = ''; 
+                }, 2000);
+            }
+        } else if (state === 'error') {
+            status.textContent = message;
+            status.classList.add('webhook-status-error');
+        } else {
+            status.textContent = message;
+        }
+    }
+
+    async function copyWebhookUrl() {
+        const input = document.getElementById('webhook-url');
+        if (!input) return;
+
+        const value = input.value.trim();
+        if (!value) {
+            setWebhookStatus('Unable to determine webhook URL.', 'error');
+            return;
+        }
+
+        try {
+            if (navigator.clipboard && window.isSecureContext) {
+                await navigator.clipboard.writeText(value);
+            } else {
+                input.focus();
+                input.select();
+                document.execCommand('copy');
+                input.setSelectionRange(0, 0);
+            }
+            setWebhookStatus('✓ Address copied to clipboard', 'success');
+        } catch (error) {
+            console.error('Webhook copy error:', error);
+            setWebhookStatus('Copy failed. Please copy manually.', 'error');
+        }
+    }
+
+    function setWebhookUrl() {
+        const input = document.getElementById('webhook-url');
+        if (!input) {
+            return;
+        }
+        input.value = buildWebhookUrl();
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        setWebhookUrl();
+    });
+</script>
