@@ -20,3 +20,7 @@ memory.json
 # Secrets and sensitive
 .env
 !config/config.yaml
+
+# AI
+.agent
+.sisyphus
