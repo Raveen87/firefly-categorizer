@@ -1,6 +1,14 @@
 <script>
     let trainingEventSource = null;
     let trainingStatusPoll = null;
+    const ACTIVE_TRAINING_STAGES = new Set(['start', 'processing']);
+
+    function isTrainingInProgress(status) {
+        if (!status) {
+            return false;
+        }
+        return Boolean(status.active) || ACTIVE_TRAINING_STAGES.has(status.stage);
+    }
 
     function setTrainingButtonsLoading() {
         const btn = document.getElementById('train-btn');
@@ -141,7 +149,7 @@
             return;
         }
 
-        if (data.active) {
+        if (isTrainingInProgress(data)) {
             setTrainingButtonsLoading();
             setPauseButtonState('active');
         } else {
@@ -391,7 +399,7 @@
             return;
         }
         applyTrainingStatus(status);
-        if (status.active || status.stage === 'start' || status.stage === 'processing') {
+        if (isTrainingInProgress(status)) {
             startTrainingStatusPoll();
         }
     });
