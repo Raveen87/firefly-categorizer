@@ -37,9 +37,13 @@ dev = [
 
 [tool.ruff]
 line-length = 120
+extend-exclude = [".agent"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "W", "UP", "B"]
+
+[tool.ty.src]
+exclude = [".agent/**"]
 
 [tool.setuptools]
 package-dir = { "" = "src" }
