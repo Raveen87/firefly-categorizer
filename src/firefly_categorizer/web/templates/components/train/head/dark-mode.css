@@ -9,8 +9,10 @@
             color: #fee2e2;
         }
 
-        :root[data-theme="dark"] .training-action-primary.opacity-50 {
-            opacity: 0.9;
+        :root[data-theme="dark"] .training-action-primary.opacity-50,
+        :root[data-theme="dark"] .training-action-primary:disabled {
+            opacity: 0.55;
+            filter: grayscale(0.45) brightness(0.85);
         }
 
         :root[data-theme="dark"] .training-action-primary {
