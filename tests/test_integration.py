@@ -385,3 +385,40 @@ async def test_training_stream_can_resume_after_pause() -> None:
     assert status["stage"] == "complete"
     assert status["trained"] == 1
     assert mock_service.learn.call_count == 2
+
+
+@pytest.mark.anyio
+async def test_training_stream_emits_terminal_event_on_reset_cancel() -> None:
+    """Resetting state during an active stream should not leave subscribers hanging."""
+    from firefly_categorizer.services.training import TrainingManager
+
+    mock_firefly = MagicMock()
+    mock_service = MagicMock()
+
+    async def mock_generator(
+        limit_per_page: int = 500,
+    ) -> AsyncGenerator[tuple[list[dict[str, Any]], dict[str, Any]], None]:
+        await asyncio.sleep(10)
+        yield [], {"total": 0}
+
+    mock_firefly.yield_transactions.side_effect = mock_generator
+
+    training_manager = TrainingManager(
+        service=mock_service,
+        firefly=mock_firefly,
+        page_size=500,
+    )
+
+    stream = training_manager.stream()
+    first_event = await asyncio.wait_for(stream.__anext__(), timeout=1.0)
+    assert '"stage": "start"' in first_event
+
+    training_manager.reset_state()
+
+    terminal_event = await asyncio.wait_for(stream.__anext__(), timeout=1.0)
+    payload = json.loads(terminal_event.removeprefix("data: ").strip())
+    assert payload["stage"] == "error"
+    assert "cancel" in payload["message"].lower()
+
+    with pytest.raises(StopAsyncIteration):
+        await asyncio.wait_for(stream.__anext__(), timeout=1.0)

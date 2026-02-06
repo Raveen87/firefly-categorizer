@@ -39,6 +39,13 @@ class TrainingManager:
         self.seen_ids.clear()
         task = self._stream_task
         if task and not task.done():
+            self._publish_status(
+                {
+                    "stage": "error",
+                    "message": "Training cancelled.",
+                },
+                active=False,
+            )
             task.cancel()
         self._stream_task = None
         self._stream_subscribers.clear()
@@ -278,6 +285,14 @@ class TrainingManager:
             self._publish_status(complete_payload, active=False)
         except asyncio.CancelledError:
             logger.info("[TRAIN] Training stream task cancelled.")
+            if self._stream_subscribers:
+                self._publish_status(
+                    {
+                        "stage": "error",
+                        "message": "Training cancelled.",
+                    },
+                    active=False,
+                )
             raise
         except Exception:
             logger.exception("[TRAIN] Training failed with an unexpected error.")
