@@ -2,6 +2,7 @@ import asyncio
 import json
 from collections import deque
 from collections.abc import AsyncGenerator
+from contextlib import suppress
 from time import perf_counter
 from typing import Any
 
@@ -29,10 +30,18 @@ class TrainingManager:
         self.active = False
         self.seen_ids: set[str] = set()
         self.status: dict[str, Any] = {"stage": "idle", "active": False}
+        self._stream_task: asyncio.Task[None] | None = None
+        self._stream_subscribers: set[asyncio.Queue[dict[str, Any]]] = set()
+        self._stream_lock = asyncio.Lock()
 
     def reset_state(self) -> int:
         cleared = len(self.seen_ids)
         self.seen_ids.clear()
+        task = self._stream_task
+        if task and not task.done():
+            task.cancel()
+        self._stream_task = None
+        self._stream_subscribers.clear()
         self.pause_event.clear()
         self.status.clear()
         self.status.update({"stage": "idle", "active": False})
@@ -54,6 +63,22 @@ class TrainingManager:
         status = dict(self.status)
         status["active"] = self.active
         return status
+
+    def _publish_status(self, payload: dict[str, Any], *, active: bool) -> None:
+        self.status.clear()
+        self.status.update({**payload, "active": active})
+        for queue in tuple(self._stream_subscribers):
+            if queue.full():
+                with suppress(asyncio.QueueEmpty):
+                    queue.get_nowait()
+            with suppress(asyncio.QueueFull):
+                queue.put_nowait(payload)
+
+    async def _ensure_stream_task(self) -> None:
+        async with self._stream_lock:
+            if self._stream_task and not self._stream_task.done():
+                return
+            self._stream_task = asyncio.create_task(self._run_training_stream())
 
     def _process_training_page(
         self,
@@ -131,15 +156,15 @@ class TrainingManager:
             "fetched": total_fetched,
         }
 
-    async def stream(self) -> AsyncGenerator[str, None]:
+    async def _run_training_stream(self) -> None:
         if not self.service or not self.firefly:
-            self.status.clear()
-            self.status.update({
-                "stage": "error",
-                "message": "Service not initialized",
-                "active": False,
-            })
-            yield f"data: {json.dumps({'stage': 'error', 'message': 'Service not initialized'})}\n\n"
+            self._publish_status(
+                {
+                    "stage": "error",
+                    "message": "Service not initialized",
+                },
+                active=False,
+            )
             return
 
         trained_count = 0
@@ -153,19 +178,19 @@ class TrainingManager:
 
         self.active = True
         self.pause_event.clear()
-        self.status.clear()
-        self.status.update({
-            "stage": "start",
-            "active": True,
-            "trained": 0,
-            "skipped": 0,
-            "fetched": 0,
-            "total": 0,
-            "percent": 0,
-            "avg_last_10_seconds": 0.0,
-            "avg_last_10_display": None,
-        })
-        yield "data: {\"stage\": \"start\"}\n\n"
+        self._publish_status(
+            {
+                "stage": "start",
+                "trained": 0,
+                "skipped": 0,
+                "fetched": 0,
+                "total": 0,
+                "percent": 0,
+                "avg_last_10_seconds": 0.0,
+                "avg_last_10_display": None,
+            },
+            active=True,
+        )
 
         try:
             async for page_txs, meta in self.firefly.yield_transactions(limit_per_page=self.page_size):
@@ -217,9 +242,7 @@ class TrainingManager:
                     "avg_last_10_seconds": avg_last_10_seconds,
                     "avg_last_10_display": format_duration(avg_last_10_seconds) if last_durations else None,
                 }
-                self.status.clear()
-                self.status.update({**status_payload, "active": True})
-                yield f"data: {json.dumps(status_payload)}\n\n"
+                self._publish_status(status_payload, active=True)
 
             if pause_requested:
                 percent = round(total_fetched / total_estimate * 100, 1) if total_estimate > 0 else 0
@@ -241,9 +264,7 @@ class TrainingManager:
                     "avg_last_10_seconds": avg_last_10_seconds if last_durations else 0.0,
                     "avg_last_10_display": format_duration(avg_last_10_seconds) if last_durations else None,
                 }
-                self.status.clear()
-                self.status.update({**pause_payload, "active": False})
-                yield f"data: {json.dumps(pause_payload)}\n\n"
+                self._publish_status(pause_payload, active=False)
                 return
 
             complete_payload = {
@@ -254,10 +275,50 @@ class TrainingManager:
                 "avg_last_10_seconds": avg_last_10_seconds if last_durations else 0.0,
                 "avg_last_10_display": format_duration(avg_last_10_seconds) if last_durations else None,
             }
-            self.status.clear()
-            self.status.update({**complete_payload, "active": False})
-            yield f"data: {json.dumps(complete_payload)}\n\n"
+            self._publish_status(complete_payload, active=False)
+        except asyncio.CancelledError:
+            logger.info("[TRAIN] Training stream task cancelled.")
+            raise
+        except Exception:
+            logger.exception("[TRAIN] Training failed with an unexpected error.")
+            self._publish_status(
+                {
+                    "stage": "error",
+                    "message": "Training failed. Check server logs.",
+                },
+                active=False,
+            )
         finally:
             self.active = False
             self.pause_event.clear()
             self.status["active"] = False
+            self._stream_task = None
+
+    async def stream(self) -> AsyncGenerator[str, None]:
+        if not self.service or not self.firefly:
+            error_payload = {
+                "stage": "error",
+                "message": "Service not initialized",
+            }
+            self._publish_status(error_payload, active=False)
+            yield f"data: {json.dumps(error_payload)}\n\n"
+            return
+
+        subscriber: asyncio.Queue[dict[str, Any]] = asyncio.Queue(maxsize=1)
+        self._stream_subscribers.add(subscriber)
+        try:
+            current_status = self.get_status()
+            current_stage = current_status.get("stage")
+            if current_stage in {"start", "processing"} or current_status.get("active"):
+                snapshot_payload = dict(current_status)
+                snapshot_payload.pop("active", None)
+                yield f"data: {json.dumps(snapshot_payload)}\n\n"
+
+            await self._ensure_stream_task()
+            while True:
+                payload = await subscriber.get()
+                yield f"data: {json.dumps(payload)}\n\n"
+                if payload.get("stage") in {"complete", "paused", "error"}:
+                    break
+        finally:
+            self._stream_subscribers.discard(subscriber)

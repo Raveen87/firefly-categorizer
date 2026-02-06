@@ -1,3 +1,5 @@
+import asyncio
+import json
 from collections.abc import AsyncGenerator
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -227,3 +229,159 @@ async def test_train_endpoint_chunking() -> None:
     args2, _ = mock_service.learn.call_args_list[1]
     assert args2[0].description == "t2"
     assert args2[1].name == "C2"
+
+
+@pytest.mark.anyio
+async def test_training_stream_continues_after_client_disconnect() -> None:
+    """Disconnecting SSE client should not cancel the running training job."""
+    from firefly_categorizer.services.training import TrainingManager
+
+    mock_firefly = MagicMock()
+    mock_service = MagicMock()
+
+    batch1 = (
+        [{
+            "id": "1",
+            "attributes": {
+                "transactions": [{
+                    "description": "t1",
+                    "category_name": "C1",
+                    "amount": 1.0,
+                    "date": "2024-01-01",
+                }],
+            },
+        }],
+        {"total": 2},
+    )
+    batch2 = (
+        [{
+            "id": "2",
+            "attributes": {
+                "transactions": [{
+                    "description": "t2",
+                    "category_name": "C2",
+                    "amount": 2.0,
+                    "date": "2024-01-02",
+                }],
+            },
+        }],
+        {"total": 2},
+    )
+
+    async def mock_generator(
+        limit_per_page: int = 500,
+    ) -> AsyncGenerator[tuple[list[dict[str, Any]], dict[str, Any]], None]:
+        yield batch1
+        await asyncio.sleep(0)
+        yield batch2
+
+    mock_firefly.yield_transactions.side_effect = mock_generator
+
+    training_manager = TrainingManager(
+        service=mock_service,
+        firefly=mock_firefly,
+        page_size=500,
+    )
+
+    stream = training_manager.stream()
+    first_event = await stream.__anext__()
+    assert '"stage": "start"' in first_event
+    await stream.aclose()
+
+    for _ in range(200):
+        status = training_manager.get_status()
+        if status.get("stage") == "complete" and not status.get("active"):
+            break
+        await asyncio.sleep(0.01)
+
+    status = training_manager.get_status()
+    assert status["stage"] == "complete"
+    assert status["trained"] == 2
+    assert status["total_fetched"] == 2
+    assert training_manager.active is False
+    assert mock_service.learn.call_count == 2
+
+
+@pytest.mark.anyio
+async def test_training_stream_can_resume_after_pause() -> None:
+    """A paused training run should continue when a new stream connection starts."""
+    from firefly_categorizer.services.training import TrainingManager
+
+    mock_firefly = MagicMock()
+    mock_service = MagicMock()
+
+    batch1 = (
+        [{
+            "id": "1",
+            "attributes": {
+                "transactions": [{
+                    "description": "t1",
+                    "category_name": "C1",
+                    "amount": 1.0,
+                    "date": "2024-01-01",
+                }],
+            },
+        }],
+        {"total": 2},
+    )
+    batch2 = (
+        [{
+            "id": "2",
+            "attributes": {
+                "transactions": [{
+                    "description": "t2",
+                    "category_name": "C2",
+                    "amount": 2.0,
+                    "date": "2024-01-02",
+                }],
+            },
+        }],
+        {"total": 2},
+    )
+
+    async def mock_generator(
+        limit_per_page: int = 500,
+    ) -> AsyncGenerator[tuple[list[dict[str, Any]], dict[str, Any]], None]:
+        yield batch1
+        await asyncio.sleep(0.02)
+        yield batch2
+
+    mock_firefly.yield_transactions.side_effect = mock_generator
+
+    training_manager = TrainingManager(
+        service=mock_service,
+        firefly=mock_firefly,
+        page_size=500,
+    )
+
+    first_stream = training_manager.stream()
+    _ = await first_stream.__anext__()
+    _ = await first_stream.__anext__()
+    assert training_manager.request_pause() is True
+    paused_event = await first_stream.__anext__()
+    paused_payload = json.loads(paused_event.removeprefix("data: ").strip())
+    assert paused_payload["stage"] == "paused"
+    await first_stream.aclose()
+
+    second_stream = training_manager.stream()
+    complete_seen = False
+    first_resume_stage: str | None = None
+    for _ in range(20):
+        try:
+            event = await asyncio.wait_for(second_stream.__anext__(), timeout=1.0)
+        except StopAsyncIteration:
+            break
+        payload = json.loads(event.removeprefix("data: ").strip())
+        if first_resume_stage is None:
+            first_resume_stage = payload.get("stage")
+        if payload.get("stage") == "complete":
+            complete_seen = True
+            break
+
+    await second_stream.aclose()
+    status = training_manager.get_status()
+    assert first_resume_stage in {"start", "processing", "complete"}
+    assert complete_seen
+    assert status["stage"] == "complete"
+    assert status["trained"] == 1
+    assert mock_service.learn.call_count == 2
