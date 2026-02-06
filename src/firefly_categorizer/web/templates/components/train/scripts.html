@@ -48,7 +48,7 @@
                 return;
             }
             applyTrainingStatus(status);
-            if (!status.active) {
+            if (!isTrainingInProgress(status)) {
                 stopTrainingStatusPoll();
             }
         }, 2000);
@@ -283,14 +283,20 @@
     }
 
     async function pauseTraining() {
-        if (!trainingEventSource) {
-            return;
-        }
         setPauseButtonState('pausing');
         try {
-            await fetch('/train-pause', { method: 'POST' });
+            const response = await fetch('/train-pause', { method: 'POST' });
+            if (!response.ok) {
+                throw new Error(`Pause request failed with status ${response.status}`);
+            }
         } catch (error) {
             console.error('Pause training error:', error);
+            const status = await fetchTrainingStatus();
+            if (status && isTrainingInProgress(status)) {
+                setPauseButtonState('active');
+                return;
+            }
+            setPauseButtonState('idle');
         }
     }
 
@@ -357,11 +363,9 @@
 
         eventSource.onerror = function (error) {
             console.error('SSE Error:', error);
-            document.getElementById('stage-error').classList.remove('hidden');
-            document.getElementById('error-message').textContent = 'Connection lost. Check server logs.';
             eventSource.close();
             trainingEventSource = null;
-            resetButton();
+            startTrainingStatusPoll();
         };
     }
 
