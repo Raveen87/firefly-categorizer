@@ -46,6 +46,11 @@ async def index(
     )
 
 
+@router.get("/favicon.ico", include_in_schema=False)
+async def favicon(request: Request) -> RedirectResponse:
+    return RedirectResponse(url=str(request.url_for("static", path="favicon.svg")), status_code=308)
+
+
 @router.get("/help", response_class=HTMLResponse)
 async def help_page(request: Request) -> HTMLResponse:
     return templates.TemplateResponse("help.html", {"request": request})
