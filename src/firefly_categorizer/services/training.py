@@ -90,11 +90,10 @@ class TrainingManager:
     def _process_training_page(
         self,
         page_txs: list[dict[str, Any]],
-    ) -> tuple[int, int, int, list[float]]:
+    ) -> tuple[int, int, int]:
         trained_count = 0
         skipped_uncategorized = 0
         skipped_duplicate = 0
-        durations: list[float] = []
 
         for t_data in page_txs:
             snapshot = build_transaction_snapshot(t_data)
@@ -108,14 +107,12 @@ class TrainingManager:
                 skipped_uncategorized += 1
                 continue
 
-            start = perf_counter()
             self.service.learn(snapshot.transaction, Category(name=category_name))
-            durations.append(perf_counter() - start)
             trained_count += 1
             if tx_id:
                 self.seen_ids.add(tx_id)
 
-        return trained_count, skipped_uncategorized, skipped_duplicate, durations
+        return trained_count, skipped_uncategorized, skipped_duplicate
 
     async def train_bulk(self) -> dict[str, Any]:
         logger.info("[TRAIN] Starting bulk training from Firefly data...")
@@ -132,7 +129,6 @@ class TrainingManager:
                 page_trained,
                 page_skipped_uncategorized,
                 page_skipped_duplicate,
-                _,
             ) = await asyncio.to_thread(self._process_training_page, page_txs)
             trained_count += page_trained
             skipped_count += page_skipped_uncategorized
@@ -179,8 +175,12 @@ class TrainingManager:
         skipped_duplicate = 0
         total_fetched = 0
         total_estimate = 0
-        last_durations: deque[float] = deque(maxlen=10)
-        avg_last_10_seconds = 0.0
+        last_fetch_durations: deque[float] = deque(maxlen=10)
+        last_train_durations: deque[float] = deque(maxlen=10)
+        last_total_durations: deque[float] = deque(maxlen=10)
+        avg_fetch_last_10_seconds = 0.0
+        avg_train_last_10_seconds = 0.0
+        avg_total_last_10_seconds = 0.0
         pause_requested = False
 
         self.active = True
@@ -193,6 +193,9 @@ class TrainingManager:
                 "fetched": 0,
                 "total": 0,
                 "percent": 0,
+                "avg_fetch_last_10_seconds": 0.0,
+                "avg_train_last_10_seconds": 0.0,
+                "avg_total_last_10_seconds": 0.0,
                 "avg_last_10_seconds": 0.0,
                 "avg_last_10_display": None,
             },
@@ -200,7 +203,19 @@ class TrainingManager:
         )
 
         try:
-            async for page_txs, meta in self.firefly.yield_transactions(limit_per_page=self.page_size):
+            transaction_pages = self.firefly.yield_transactions(limit_per_page=self.page_size).__aiter__()
+            while True:
+                if self.pause_event.is_set():
+                    pause_requested = True
+                    break
+
+                page_fetch_started = perf_counter()
+                try:
+                    page_txs, meta = await transaction_pages.__anext__()
+                except StopAsyncIteration:
+                    break
+                page_fetch_seconds = perf_counter() - page_fetch_started
+
                 if self.pause_event.is_set():
                     pause_requested = True
                     break
@@ -210,21 +225,35 @@ class TrainingManager:
 
                 total_fetched += len(page_txs)
 
+                page_process_started = perf_counter()
                 (
                     page_trained,
                     page_skipped_uncategorized,
                     page_skipped_duplicate,
-                    page_durations,
                 ) = await asyncio.to_thread(self._process_training_page, page_txs)
+                page_process_seconds = perf_counter() - page_process_started
                 trained_count += page_trained
                 skipped_count += page_skipped_uncategorized
                 skipped_duplicate += page_skipped_duplicate
-                last_durations.extend(page_durations)
-                avg_last_10_seconds = (
-                    sum(last_durations) / len(last_durations)
-                    if last_durations
-                    else 0.0
-                )
+
+                page_count = len(page_txs)
+                if page_count > 0:
+                    fetch_per_tx_seconds = page_fetch_seconds / page_count
+                    train_per_tx_seconds = page_process_seconds / page_count
+                    total_per_tx_seconds = fetch_per_tx_seconds + train_per_tx_seconds
+                    # Keep one representative sample per page to smooth across pages.
+                    last_fetch_durations.append(fetch_per_tx_seconds)
+                    last_train_durations.append(train_per_tx_seconds)
+                    last_total_durations.append(total_per_tx_seconds)
+                    avg_fetch_last_10_seconds = (
+                        sum(last_fetch_durations) / len(last_fetch_durations)
+                    )
+                    avg_train_last_10_seconds = (
+                        sum(last_train_durations) / len(last_train_durations)
+                    )
+                    avg_total_last_10_seconds = (
+                        sum(last_total_durations) / len(last_total_durations)
+                    )
 
                 logger.info(
                     "[TRAIN] Page processed. Skipped (already trained): %s, "
@@ -246,8 +275,16 @@ class TrainingManager:
                     "fetched": total_fetched,
                     "total": total_estimate,
                     "percent": percent,
-                    "avg_last_10_seconds": avg_last_10_seconds,
-                    "avg_last_10_display": format_duration(avg_last_10_seconds) if last_durations else None,
+                    "avg_fetch_last_10_seconds": avg_fetch_last_10_seconds,
+                    "avg_train_last_10_seconds": avg_train_last_10_seconds,
+                    "avg_total_last_10_seconds": avg_total_last_10_seconds,
+                    # Backward compatibility for older clients expecting one value.
+                    "avg_last_10_seconds": avg_total_last_10_seconds,
+                    "avg_last_10_display": (
+                        format_duration(avg_total_last_10_seconds)
+                        if last_total_durations
+                        else None
+                    ),
                 }
                 self._publish_status(status_payload, active=True)
 
@@ -268,8 +305,23 @@ class TrainingManager:
                     "fetched": total_fetched,
                     "total": total_estimate,
                     "percent": percent,
-                    "avg_last_10_seconds": avg_last_10_seconds if last_durations else 0.0,
-                    "avg_last_10_display": format_duration(avg_last_10_seconds) if last_durations else None,
+                    "avg_fetch_last_10_seconds": (
+                        avg_fetch_last_10_seconds if last_total_durations else 0.0
+                    ),
+                    "avg_train_last_10_seconds": (
+                        avg_train_last_10_seconds if last_total_durations else 0.0
+                    ),
+                    "avg_total_last_10_seconds": (
+                        avg_total_last_10_seconds if last_total_durations else 0.0
+                    ),
+                    "avg_last_10_seconds": (
+                        avg_total_last_10_seconds if last_total_durations else 0.0
+                    ),
+                    "avg_last_10_display": (
+                        format_duration(avg_total_last_10_seconds)
+                        if last_total_durations
+                        else None
+                    ),
                 }
                 self._publish_status(pause_payload, active=False)
                 return
@@ -279,8 +331,23 @@ class TrainingManager:
                 "trained": trained_count,
                 "skipped": skipped_count,
                 "total_fetched": total_fetched,
-                "avg_last_10_seconds": avg_last_10_seconds if last_durations else 0.0,
-                "avg_last_10_display": format_duration(avg_last_10_seconds) if last_durations else None,
+                "avg_fetch_last_10_seconds": (
+                    avg_fetch_last_10_seconds if last_total_durations else 0.0
+                ),
+                "avg_train_last_10_seconds": (
+                    avg_train_last_10_seconds if last_total_durations else 0.0
+                ),
+                "avg_total_last_10_seconds": (
+                    avg_total_last_10_seconds if last_total_durations else 0.0
+                ),
+                "avg_last_10_seconds": (
+                    avg_total_last_10_seconds if last_total_durations else 0.0
+                ),
+                "avg_last_10_display": (
+                    format_duration(avg_total_last_10_seconds)
+                    if last_total_durations
+                    else None
+                ),
             }
             self._publish_status(complete_payload, active=False)
         except asyncio.CancelledError:
