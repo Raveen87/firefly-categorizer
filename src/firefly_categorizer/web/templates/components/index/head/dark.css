@@ -24,15 +24,16 @@
     }
 
     :root[data-theme="dark"] .toggle-checkbox {
-        background: #0b1120;
+        background: rgba(148, 163, 184, 0.16);
+        border-color: rgba(148, 163, 184, 0.35);
+    }
+
+    :root[data-theme="dark"] .toggle-checkbox::after {
+        background: #e2e8f0;
         border-color: rgba(148, 163, 184, 0.45);
     }
 
-    :root[data-theme="dark"] .toggle-label {
-        background: rgba(148, 163, 184, 0.2);
-    }
-
-    :root[data-theme="dark"] .toggle-checkbox:disabled + .toggle-label {
+    :root[data-theme="dark"] .toggle-checkbox:disabled {
         background: rgba(148, 163, 184, 0.12);
     }
 

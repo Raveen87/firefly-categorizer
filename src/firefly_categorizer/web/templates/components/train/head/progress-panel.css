@@ -76,6 +76,10 @@
             gap: 18px;
         }
 
+        .progress-stage-stack.hidden {
+            display: none;
+        }
+
         .progress-stage-card {
             border: 1px solid #e2e8f0;
             border-radius: 16px;

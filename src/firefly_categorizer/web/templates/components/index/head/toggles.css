@@ -3,6 +3,7 @@
         align-items: center;
         gap: 12px;
         flex-wrap: wrap;
+        min-height: 44px;
     }
 
     .toggle-text {
@@ -14,10 +15,12 @@
     }
 
     .toggle-switch {
-        position: relative;
-        width: 44px;
-        height: 24px;
-        flex: 0 0 44px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: flex-start;
+        width: 48px;
+        height: 26px;
+        flex: 0 0 48px;
     }
 
     .tooltip::after {
@@ -49,44 +52,48 @@
     }
 
     .toggle-checkbox {
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 24px;
-        height: 24px;
+        position: relative;
+        width: 48px;
+        height: 26px;
+        margin: 0;
         border-radius: 999px;
-        background: #fff;
-        border: 2px solid rgba(15, 23, 42, 0.2);
-        appearance: none;
+        border: 1px solid var(--line);
+        background: rgba(15, 23, 42, 0.08);
         cursor: pointer;
+        appearance: none;
+        -webkit-appearance: none;
+        -moz-appearance: none;
+        transition: background 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .toggle-checkbox::after {
+        content: "";
+        position: absolute;
+        top: 3px;
+        left: 3px;
+        width: 18px;
+        height: 18px;
+        border-radius: 999px;
+        background: var(--panel-strong);
+        border: 1px solid rgba(15, 23, 42, 0.14);
         transition: transform 0.2s ease, border 0.2s ease;
     }
 
     .toggle-checkbox:checked {
+        background: rgba(31, 157, 176, 0.26);
+        border-color: rgba(31, 157, 176, 0.45);
+    }
+
+    .toggle-checkbox:checked::after {
         transform: translateX(20px);
         border-color: var(--accent);
     }
 
-    .toggle-label {
-        display: block;
-        width: 44px;
-        height: 24px;
-        background: rgba(15, 23, 42, 0.12);
-        border-radius: 999px;
-        cursor: pointer;
-        transition: background 0.2s ease;
-    }
-
-    .toggle-checkbox:checked + .toggle-label {
-        background: rgba(31, 157, 176, 0.35);
+    .toggle-checkbox:focus-visible {
+        box-shadow: 0 0 0 2px rgba(31, 157, 176, 0.24);
     }
 
     .toggle-checkbox:disabled {
         cursor: not-allowed;
-        background: var(--panel-soft);
-    }
-
-    .toggle-checkbox:disabled + .toggle-label {
         background: #e5e7eb;
-        cursor: not-allowed;
     }

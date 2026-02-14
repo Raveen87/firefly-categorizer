@@ -9,13 +9,14 @@
         display: grid;
         gap: 18px;
         grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-        align-items: end;
+        align-items: start;
     }
 
     .field-group {
         display: flex;
         flex-direction: column;
         gap: 8px;
+        min-width: 0;
     }
 
     .field-group.is-disabled {
@@ -58,9 +59,10 @@
         color: var(--scope-strip-ink-strong);
     }
 
-    .field-group input,
+    .field-group input:not([type="checkbox"]),
     .field-group select {
         width: 100%;
+        box-sizing: border-box;
         padding: 10px 12px;
         border: 1px solid var(--line);
         border-radius: 12px;
@@ -69,9 +71,15 @@
         color: var(--ink);
     }
 
-    .field-group input:disabled {
+    .field-group input:not([type="checkbox"]):disabled {
         background: var(--panel-soft);
         color: var(--muted);
+    }
+
+    @media (min-width: 1180px) {
+        .filter-grid {
+            grid-template-columns: minmax(260px, 1.35fr) repeat(2, minmax(190px, 1fr)) minmax(180px, 0.9fr) minmax(140px, 0.8fr);
+        }
     }
 
     .select-input {
