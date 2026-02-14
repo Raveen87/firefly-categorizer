@@ -298,6 +298,13 @@ async def test_training_stream_continues_after_client_disconnect() -> None:
     assert status["stage"] == "complete"
     assert status["trained"] == 2
     assert status["total_fetched"] == 2
+    assert isinstance(status["avg_fetch_last_10_seconds"], float)
+    assert isinstance(status["avg_train_last_10_seconds"], float)
+    assert isinstance(status["avg_total_last_10_seconds"], float)
+    assert status["avg_total_last_10_seconds"] >= 0
+    assert status["avg_total_last_10_seconds"] == pytest.approx(
+        status["avg_fetch_last_10_seconds"] + status["avg_train_last_10_seconds"],
+    )
     assert training_manager.active is False
     assert mock_service.learn.call_count == 2
 

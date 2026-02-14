@@ -77,10 +77,20 @@
         const percent = Number.isFinite(data.percent)
             ? data.percent
             : (total > 0 ? Math.round((fetched / total) * 1000) / 10 : 0);
-        const avgSeconds = Number.isFinite(data.avg_last_10_seconds) ? data.avg_last_10_seconds : 0;
+        const avgFetchSeconds = Number.isFinite(data.avg_fetch_last_10_seconds)
+            ? data.avg_fetch_last_10_seconds
+            : 0;
+        const avgTrainSeconds = Number.isFinite(data.avg_train_last_10_seconds)
+            ? data.avg_train_last_10_seconds
+            : 0;
+        const hasBreakdownTiming = Number.isFinite(data.avg_fetch_last_10_seconds)
+            && Number.isFinite(data.avg_train_last_10_seconds);
+        const avgTotalSeconds = Number.isFinite(data.avg_total_last_10_seconds)
+            ? data.avg_total_last_10_seconds
+            : (Number.isFinite(data.avg_last_10_seconds) ? data.avg_last_10_seconds : 0);
         const remaining = total - fetched;
-        const etaText = remaining > 0 && avgSeconds
-            ? formatDuration(remaining * avgSeconds)
+        const etaText = remaining > 0 && avgTotalSeconds
+            ? formatDuration(remaining * avgTotalSeconds)
             : 'N/A';
         const statsText = total
             ? `${fetched} / ${total} processed (${percent}%) | ETA: ${etaText}`
@@ -90,8 +100,10 @@
         document.getElementById('process-progress').style.width = `${percent}%`;
         document.getElementById('process-trained').textContent = data.trained ?? 0;
         document.getElementById('process-skipped').textContent = data.skipped ?? 0;
-        document.getElementById('process-average').textContent = avgSeconds
-            ? formatDuration(avgSeconds)
+        document.getElementById('process-average').textContent = avgTotalSeconds
+            ? (hasBreakdownTiming
+                ? `${formatDuration(avgFetchSeconds)} + ${formatDuration(avgTrainSeconds)} = ${formatDuration(avgTotalSeconds)}`
+                : formatDuration(avgTotalSeconds))
             : 'N/A';
     }
 
