@@ -131,6 +131,7 @@
     box-shadow: var(--shadow-soft);
     display: grid;
     gap: 10px;
+    min-width: 0;
 }
 
 .config-field.is-locked {
@@ -162,11 +163,13 @@
 
 .config-input {
     position: relative;
+    min-width: 0;
 }
 
 .config-input input,
 .config-input select {
     width: 100%;
+    box-sizing: border-box;
     border: 1px solid var(--line);
     border-radius: 12px;
     padding: 10px 38px 10px 12px;

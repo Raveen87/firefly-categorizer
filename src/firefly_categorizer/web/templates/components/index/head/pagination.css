@@ -6,6 +6,10 @@
         padding: 14px 0;
     }
 
+    .pagination-controls.hidden {
+        display: none;
+    }
+
     .page-btn {
         padding: 6px 14px;
         border-radius: 999px;

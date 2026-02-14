@@ -52,10 +52,6 @@
     margin-bottom: 1.5rem;
 }
 
-.hidden {
-    display: none;
-}
-
 .block {
     display: block;
 }
@@ -74,6 +70,10 @@
 
 .grid {
     display: grid;
+}
+
+.hidden {
+    display: none;
 }
 
 .items-start {

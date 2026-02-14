@@ -22,3 +22,7 @@
         gap: 8px;
         color: var(--ink-soft);
     }
+
+    .loading-state.hidden {
+        display: none;
+    }
