@@ -194,6 +194,8 @@ CONFIG_TEMPLATE = """# Firefly Categorizer configuration
 # LOG_LEVEL:
 """
 
+DOCKER_UI_LOCKED_KEYS: tuple[str, ...] = ("DATA_DIR", "LOG_DIR", "LOG_LEVEL")
+
 
 def get_config_keys() -> tuple[str, ...]:
     return tuple(field.key for field in CONFIG_FIELDS)
@@ -229,6 +231,7 @@ def build_config_context(
     config_values = _load_config_values(config_path)
     sections: list[dict[str, object]] = []
     env_override_count = 0
+    docker_ui_locked_fields: list[str] = []
 
     for category, fields in _group_fields():
         section_fields: list[dict[str, object]] = []
@@ -236,6 +239,8 @@ def build_config_context(
             env_override = settings.is_env_override(field.key)
             if env_override:
                 env_override_count += 1
+                if field.key in DOCKER_UI_LOCKED_KEYS:
+                    docker_ui_locked_fields.append(field.key)
             raw_value = config_values.get(field.key, "")
             display_value = raw_value
             if env_override:
@@ -273,6 +278,7 @@ def build_config_context(
         "config_path": config_path or "Not configured",
         "sections": sections,
         "env_override_count": env_override_count,
+        "docker_ui_locked_fields": docker_ui_locked_fields,
     }
 
 

@@ -99,6 +99,11 @@
     color: #dc2626;
 }
 
+.config-status-info {
+    border-color: rgba(37, 99, 235, 0.45);
+    color: #1d4ed8;
+}
+
 .config-form {
     display: grid;
     gap: 28px;

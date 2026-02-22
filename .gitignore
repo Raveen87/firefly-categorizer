@@ -16,6 +16,7 @@ wheels/
 # User data
 memory.json
 *.pkl
+logs/
 
 # Secrets and sensitive
 .env
