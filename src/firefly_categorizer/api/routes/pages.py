@@ -19,6 +19,15 @@ templates_dir = os.path.abspath(
 templates = Jinja2Templates(directory=templates_dir)
 
 
+def render_template(request: Request, name: str, context: dict[str, object]) -> HTMLResponse:
+    try:
+        return templates.TemplateResponse(request=request, name=name, context=context)
+    except TypeError as exc:
+        if "unexpected keyword argument 'request'" not in str(exc):
+            raise
+        return templates.TemplateResponse(name, context)
+
+
 @router.get("/", response_class=HTMLResponse)
 async def index(
     request: Request,
@@ -34,7 +43,8 @@ async def index(
 
     scope_mode = "all" if is_all_scope(scope) else "range"
 
-    return templates.TemplateResponse(
+    return render_template(
+        request,
         "index.html",
         {
             "request": request,
@@ -53,19 +63,20 @@ async def favicon(request: Request) -> RedirectResponse:
 
 @router.get("/help", response_class=HTMLResponse)
 async def help_page(request: Request) -> HTMLResponse:
-    return templates.TemplateResponse("help.html", {"request": request})
+    return render_template(request, "help.html", {"request": request})
 
 
 @router.get("/train", response_class=HTMLResponse)
 async def train_page(request: Request) -> HTMLResponse:
-    return templates.TemplateResponse("train.html", {"request": request})
+    return render_template(request, "train.html", {"request": request})
 
 
 @router.get("/config", response_class=HTMLResponse)
 async def config_page(request: Request, saved: bool = False) -> HTMLResponse:
     context = configuration.build_config_context()
     status = "Configuration saved." if saved else None
-    return templates.TemplateResponse(
+    return render_template(
+        request,
         "config.html",
         {
             "request": request,
@@ -83,7 +94,8 @@ async def save_config(request: Request) -> Response:
     errors, updates = configuration.apply_config_updates(payload)
     if errors:
         context = configuration.build_config_context(field_errors=errors)
-        return templates.TemplateResponse(
+        return render_template(
+            request,
             "config.html",
             {
                 "request": request,
