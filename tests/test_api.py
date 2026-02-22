@@ -1,9 +1,12 @@
+import asyncio
 from collections.abc import Generator
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from fastapi.testclient import TestClient
 
+from firefly_categorizer.api.routes import pages
 from firefly_categorizer.main import app
 from firefly_categorizer.models import CategorizationResult, Category
 from firefly_categorizer.services.categorization import CategorizationPipeline
@@ -151,3 +154,103 @@ def test_get_categories_empty(mock_firefly: AsyncMock) -> None:
     response = client.get("/api/categories")
     assert response.status_code == 200
     assert response.json() == []
+
+
+def test_save_config_accepts_form_post(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured_payload: dict[str, str] = {}
+
+    def fake_apply_config_updates(payload: dict[str, str]) -> tuple[dict[str, str], dict[str, Any]]:
+        nonlocal captured_payload
+        captured_payload = payload
+        return {}, {"OPENAI_MODEL": payload["OPENAI_MODEL"]}
+
+    def fake_apply_runtime_updates(_app: Any, updates: dict[str, Any]) -> None:
+        assert updates == {"OPENAI_MODEL": "gpt-4o-mini"}
+
+    monkeypatch.setattr(
+        "firefly_categorizer.api.routes.pages.configuration.apply_config_updates",
+        fake_apply_config_updates,
+    )
+    monkeypatch.setattr(
+        "firefly_categorizer.api.routes.pages.configuration.apply_runtime_updates",
+        fake_apply_runtime_updates,
+    )
+
+    response = client.post(
+        "/config",
+        data={"OPENAI_MODEL": "gpt-4o-mini"},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 303
+    assert response.headers["location"] == "/config?saved=1"
+    assert captured_payload == {"OPENAI_MODEL": "gpt-4o-mini"}
+
+
+def test_training_page_defaults_to_start_training_label() -> None:
+    response = client.get("/train")
+    assert response.status_code == 200
+    assert "Start Training" in response.text
+
+
+def test_pages_routes_fall_back_to_legacy_template_response_signature(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[tuple[str, dict[str, Any]]] = []
+
+    def fake_template_response(*args: Any, **kwargs: Any) -> dict[str, Any]:
+        if kwargs:
+            raise TypeError("TemplateResponse() got an unexpected keyword argument 'request'")
+
+        name, context = args
+        calls.append((name, context))
+        return {"name": name, "context": context}
+
+    monkeypatch.setattr(
+        "firefly_categorizer.api.routes.pages.templates.TemplateResponse",
+        fake_template_response,
+    )
+    monkeypatch.setattr(
+        "firefly_categorizer.api.routes.pages.configuration.build_config_context",
+        lambda field_errors=None: {"field_errors": field_errors},
+    )
+    monkeypatch.setattr(
+        "firefly_categorizer.api.routes.pages.configuration.apply_config_updates",
+        lambda _payload: ({"OPENAI_MODEL": "Required"}, {}),
+    )
+
+    request = MagicMock()
+    request.form = AsyncMock(return_value={"OPENAI_MODEL": ""})
+
+    index_response = asyncio.run(
+        pages.index(
+            request=request,
+            firefly=None,
+            start_date="2024-01-01",
+            end_date="2024-01-31",
+            scope=None,
+        )
+    )
+    help_response = asyncio.run(pages.help_page(request))
+    train_response = asyncio.run(pages.train_page(request))
+    config_response = asyncio.run(pages.config_page(request, saved=True))
+    invalid_config_response = asyncio.run(pages.save_config(request))
+
+    assert index_response["name"] == "index.html"
+    assert index_response["context"]["request"] is request
+    assert index_response["context"]["scope"] == "range"
+    assert help_response["name"] == "help.html"
+    assert help_response["context"]["request"] is request
+    assert train_response["name"] == "train.html"
+    assert train_response["context"]["request"] is request
+    assert config_response["name"] == "config.html"
+    assert config_response["context"]["status"] == "Configuration saved."
+    assert invalid_config_response["name"] == "config.html"
+    assert invalid_config_response["context"]["errors"] == {"OPENAI_MODEL": "Required"}
+    assert [name for name, _context in calls] == [
+        "index.html",
+        "help.html",
+        "train.html",
+        "config.html",
+        "config.html",
+    ]
