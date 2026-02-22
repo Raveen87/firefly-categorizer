@@ -34,6 +34,11 @@
             Fix the highlighted fields and try again.
         </div>
     {% endif %}
+    {% if docker_ui_locked_fields and docker_ui_locked_fields|length %}
+        <div class="config-status config-status-info">
+            {{ docker_ui_locked_fields|join(", ") }} are always UI-locked when running in Docker.
+        </div>
+    {% endif %}
 
     <form method="post" class="config-form">
         {% for section in sections %}

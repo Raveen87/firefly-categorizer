@@ -1,17 +1,16 @@
 services:
-  app:
-    build: .
+  firefly-categorizer:
+    image: fifcat/firefly-categorizer:latest
+    restart: unless-stopped
     ports:
       - "8000:8000"
     environment:
-      # Pass through environment variables
-      - FIREFLY_URL=${FIREFLY_URL}
-      - FIREFLY_TOKEN=${FIREFLY_TOKEN}
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - FIREFLY_URL=<URL to your Firefly III instance>
+      - FIREFLY_TOKEN=<Firefly III access token>
+      - OPENAI_API_KEY=<OpenAI API key>
     volumes:
       # Persist the Models and Memory
       - ./data:/app/data
       # Persist logs and configuration
       - ./logs:/app/logs
       - ./config:/app/config
-    restart: unless-stopped
