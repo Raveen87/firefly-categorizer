@@ -16,7 +16,7 @@ from firefly_categorizer.domain.transactions import (
     build_transaction_snapshot,
     build_transactions_display,
 )
-from firefly_categorizer.integration.firefly import FireflyClient
+from firefly_categorizer.integration.firefly import FireflyClient, FireflyConfigurationError
 from firefly_categorizer.manager import CategorizerService
 from firefly_categorizer.services.categorization import CategorizationPipeline
 from firefly_categorizer.services.firefly_data import fetch_category_names, resolve_date_range
@@ -49,6 +49,9 @@ async def categorize_stream(
                 page=page,
                 limit=limit,
             )
+        except FireflyConfigurationError as exc:
+            yield f"data: {json.dumps({'error': str(exc)})}\n\n"
+            return
         except Exception as exc:
             yield f"data: {json.dumps({'error': f'Error fetching transactions: {exc!r}'})}\n\n"
             return
@@ -100,17 +103,21 @@ async def get_transactions(
     pagination: dict[str, Any] = {}
 
     if firefly:
-        category_list = await fetch_category_names(firefly, sort=True)
-
         start_date_obj, end_date_obj = resolve_date_range(start_date, end_date, scope)
 
         try:
+            category_list = await fetch_category_names(firefly, sort=True, raise_on_error=True)
             result = await firefly.get_transactions(
                 start_date=start_date_obj,
                 end_date=end_date_obj,
                 page=page,
                 limit=limit,
             )
+        except FireflyConfigurationError as exc:
+            raise HTTPException(
+                status_code=503,
+                detail=str(exc),
+            ) from exc
         except Exception as exc:
             raise HTTPException(
                 status_code=502,
@@ -162,6 +169,11 @@ async def get_categories(
 
     try:
         return await fetch_category_names(firefly, sort=True, raise_on_error=True)
+    except FireflyConfigurationError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=str(exc),
+        ) from exc
     except Exception as exc:
         raise HTTPException(
             status_code=502,

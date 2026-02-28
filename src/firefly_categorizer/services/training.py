@@ -8,7 +8,7 @@ from typing import Any
 
 from firefly_categorizer.domain.timefmt import format_duration
 from firefly_categorizer.domain.transactions import build_transaction_snapshot
-from firefly_categorizer.integration.firefly import FireflyClient
+from firefly_categorizer.integration.firefly import FireflyClient, FireflyConfigurationError
 from firefly_categorizer.logger import get_logger
 from firefly_categorizer.manager import CategorizerService
 from firefly_categorizer.models import Category
@@ -116,6 +116,7 @@ class TrainingManager:
 
     async def train_bulk(self) -> dict[str, Any]:
         logger.info("[TRAIN] Starting bulk training from Firefly data...")
+        self.firefly.require_credentials()
 
         trained_count = 0
         skipped_count = 0
@@ -165,6 +166,18 @@ class TrainingManager:
                 {
                     "stage": "error",
                     "message": "Service not initialized",
+                },
+                active=False,
+            )
+            return
+
+        try:
+            self.firefly.require_credentials()
+        except FireflyConfigurationError as exc:
+            self._publish_status(
+                {
+                    "stage": "error",
+                    "message": str(exc),
                 },
                 active=False,
             )
@@ -361,6 +374,15 @@ class TrainingManager:
                     active=False,
                 )
             raise
+        except FireflyConfigurationError as exc:
+            logger.warning("[TRAIN] Training blocked by Firefly configuration: %s", exc)
+            self._publish_status(
+                {
+                    "stage": "error",
+                    "message": str(exc),
+                },
+                active=False,
+            )
         except Exception:
             logger.exception("[TRAIN] Training failed with an unexpected error.")
             self._publish_status(

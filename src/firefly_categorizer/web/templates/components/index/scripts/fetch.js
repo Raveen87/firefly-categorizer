@@ -1,3 +1,12 @@
+async function readErrorMessage(response, fallbackMessage) {
+    try {
+        const err = await response.json();
+        return err.detail || err.message || fallbackMessage;
+    } catch (_error) {
+        return `Error ${response.status}: ${response.statusText}`;
+    }
+}
+
 async function fetchTransactions(predict = false) {
     // Lock UI
     if (typeof toggleControls === 'function') toggleControls(true);
@@ -20,14 +29,7 @@ async function fetchTransactions(predict = false) {
         const response = await fetch(`/api/transactions?${params.toString()}`);
 
         if (!response.ok) {
-            let errorMessage = 'Error fetching transactions';
-            try {
-                const err = await response.json();
-                errorMessage = err.detail || errorMessage;
-            } catch (e) {
-                errorMessage = `Error ${response.status}: ${response.statusText}`;
-            }
-            throw new Error(errorMessage);
+            throw new Error(await readErrorMessage(response, 'Error fetching transactions'));
         }
 
         const data = await response.json();
@@ -76,7 +78,7 @@ async function fetchCategories() {
     try {
         const response = await fetch('/api/categories');
         if (!response.ok) {
-            throw new Error('Failed to fetch categories');
+            throw new Error(await readErrorMessage(response, 'Failed to fetch categories'));
         }
         CATEGORIES = await response.json();
 
@@ -87,7 +89,14 @@ async function fetchCategories() {
 
     } catch (error) {
         console.error('Error fetching categories:', error);
-        if (dom.categoriesError) dom.categoriesError.classList.remove('hidden');
+        if (dom.categoriesError) {
+            dom.categoriesError.title = error.message || 'Failed to load categories';
+            dom.categoriesError.classList.remove('hidden');
+        }
+        if (dom.errorAlert && dom.errorText) {
+            dom.errorText.textContent = `Unable to load categories: ${error.message || 'Failed to load categories.'}`;
+            dom.errorAlert.classList.remove('hidden');
+        }
     } finally {
         if (dom.categoriesLoading) dom.categoriesLoading.classList.add('hidden');
     }

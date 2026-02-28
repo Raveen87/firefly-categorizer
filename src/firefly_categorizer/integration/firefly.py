@@ -14,6 +14,11 @@ logger = get_logger(__name__)
 DEFAULT_CATEGORIES_CACHE_TTL_SECONDS = 60.0
 DEFAULT_HTTP_TIMEOUT_SECONDS = 60.0
 
+
+class FireflyConfigurationError(RuntimeError):
+    """Raised when Firefly API credentials are missing."""
+
+
 def _parse_env_float(name: str, default: float) -> float:
     raw = os.getenv(name)
     if not raw:
@@ -82,6 +87,15 @@ class FireflyClient:
             )
         self._http_timeout = max(0.0, timeout)
         logger.info("[INIT] FireflyClient initialized with timeout=%.2fs", self._http_timeout)
+
+    def require_credentials(self) -> None:
+        if self.base_url and self.token:
+            return
+
+        logger.error("Firefly credentials missing.")
+        raise FireflyConfigurationError(
+            "Firefly API credentials are missing. Configure FIREFLY_URL and FIREFLY_TOKEN."
+        )
 
     def refresh(self, base_url: str | None = None, token: str | None = None) -> None:
         base_value = base_url if base_url is not None else os.getenv("FIREFLY_URL")
@@ -195,9 +209,7 @@ class FireflyClient:
         limit: int = 50,
         page: int = 1,
     ) -> dict:
-        if not self.base_url or not self.token:
-            logger.error("Firefly credentials missing.")
-            return {"data": [], "meta": {}}
+        self.require_credentials()
 
         client = await self._get_client()
         try:
@@ -239,8 +251,7 @@ class FireflyClient:
 
     async def get_all_transactions(self, limit_per_page: int = 500) -> dict:
         """Fetch all transactions with pagination. Returns dict with transactions and metadata."""
-        if not self.base_url or not self.token:
-            return {"transactions": [], "total": 0}
+        self.require_credentials()
 
         all_transactions = []
         page = 1
@@ -294,8 +305,7 @@ class FireflyClient:
         self, limit_per_page: int = 500
     ) -> AsyncGenerator[tuple[list[dict[str, Any]], dict[str, Any]], None]:
         """Async generator that yields pages of transactions and metadata."""
-        if not self.base_url or not self.token:
-            return
+        self.require_credentials()
 
         page = 1
         sort_supported = True
@@ -385,6 +395,8 @@ class FireflyClient:
 
     async def get_categories(self, *, use_cache: bool = True, raise_on_error: bool = False) -> list[dict]:
         if not self.base_url or not self.token:
+            if raise_on_error:
+                self.require_credentials()
             return []
 
         if use_cache:
