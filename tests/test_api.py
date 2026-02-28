@@ -7,6 +7,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from firefly_categorizer.api.routes import pages
+from firefly_categorizer.integration.firefly import FireflyConfigurationError
 from firefly_categorizer.main import app
 from firefly_categorizer.models import CategorizationResult, Category
 from firefly_categorizer.services.categorization import CategorizationPipeline
@@ -43,6 +44,21 @@ def mock_service(mock_firefly: AsyncMock) -> Generator[MagicMock, None, None]:
         app.state.pipeline = original_pipeline
     else:
         delattr(app.state, "pipeline")
+
+
+@pytest.fixture
+def mock_training_manager() -> Generator[MagicMock, None, None]:
+    had_training_manager = hasattr(app.state, "training_manager")
+    original_training_manager = getattr(app.state, "training_manager", None)
+    mock = MagicMock()
+    mock.train_bulk = AsyncMock()
+    app.state.training_manager = mock
+    yield mock
+    if had_training_manager:
+        app.state.training_manager = original_training_manager
+    else:
+        delattr(app.state, "training_manager")
+
 
 def test_get_transactions_no_predict(mock_firefly: AsyncMock, mock_service: MagicMock) -> None:
     # Mock Firefly returning uncategorized transactions
@@ -116,6 +132,46 @@ def test_get_transactions_with_predict(
     assert data["transactions"][0]["prediction"]["category"]["name"] == "Food"
 
 
+def test_get_transactions_missing_firefly_credentials(mock_firefly: AsyncMock) -> None:
+    mock_firefly.get_categories.side_effect = FireflyConfigurationError(
+        "Firefly API credentials are missing. Configure FIREFLY_URL and FIREFLY_TOKEN."
+    )
+
+    response = client.get("/api/transactions")
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == (
+        "Firefly API credentials are missing. Configure FIREFLY_URL and FIREFLY_TOKEN."
+    )
+
+
+def test_categorize_missing_firefly_credentials(
+    mock_firefly: AsyncMock,
+    mock_service: MagicMock,
+) -> None:
+    mock_firefly.get_categories.side_effect = FireflyConfigurationError(
+        "Firefly API credentials are missing. Configure FIREFLY_URL and FIREFLY_TOKEN."
+    )
+
+    response = client.post(
+        "/categorize",
+        json={
+            "transaction": {
+                "description": "coffee",
+                "amount": 12.5,
+                "date": "2023-01-01T10:00:00Z",
+                "currency": "EUR",
+            }
+        },
+    )
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == (
+        "Firefly API credentials are missing. Configure FIREFLY_URL and FIREFLY_TOKEN."
+    )
+    mock_service.categorize.assert_not_called()
+
+
 def test_get_categories(mock_firefly: AsyncMock) -> None:
     mock_firefly.get_categories.return_value = [
         {"attributes": {"name": "Food"}},
@@ -132,6 +188,94 @@ def test_get_categories_error(mock_firefly: AsyncMock) -> None:
     response = client.get("/api/categories")
     assert response.status_code == 502
     assert "Firefly error" in response.json()["detail"]
+
+
+def test_get_categories_missing_firefly_credentials(mock_firefly: AsyncMock) -> None:
+    mock_firefly.get_categories.side_effect = FireflyConfigurationError(
+        "Firefly API credentials are missing. Configure FIREFLY_URL and FIREFLY_TOKEN."
+    )
+
+    response = client.get("/api/categories")
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == (
+        "Firefly API credentials are missing. Configure FIREFLY_URL and FIREFLY_TOKEN."
+    )
+
+
+def test_train_models_missing_firefly_credentials(mock_training_manager: MagicMock) -> None:
+    mock_training_manager.train_bulk.side_effect = FireflyConfigurationError(
+        "Firefly API credentials are missing. Configure FIREFLY_URL and FIREFLY_TOKEN."
+    )
+
+    response = client.post("/train")
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == (
+        "Firefly API credentials are missing. Configure FIREFLY_URL and FIREFLY_TOKEN."
+    )
+
+
+def test_learn_transaction_missing_firefly_credentials(
+    mock_firefly: AsyncMock,
+    mock_service: MagicMock,
+) -> None:
+    mock_firefly.require_credentials = MagicMock(
+        side_effect=FireflyConfigurationError(
+            "Firefly API credentials are missing. Configure FIREFLY_URL and FIREFLY_TOKEN."
+        )
+    )
+
+    response = client.post(
+        "/learn",
+        json={
+            "transaction": {
+                "description": "coffee",
+                "amount": 12.5,
+                "date": "2023-01-01T10:00:00Z",
+                "currency": "EUR",
+            },
+            "category": {"name": "Food"},
+            "transaction_id": "tx-1",
+            "existing_tags": [],
+        },
+    )
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == (
+        "Firefly API credentials are missing. Configure FIREFLY_URL and FIREFLY_TOKEN."
+    )
+    mock_service.learn.assert_not_called()
+
+
+def test_learn_transaction_rejects_failed_firefly_update(
+    mock_firefly: AsyncMock,
+    mock_service: MagicMock,
+) -> None:
+    mock_firefly.require_credentials = MagicMock(return_value=None)
+    mock_firefly.update_transaction.return_value = False
+
+    response = client.post(
+        "/learn",
+        json={
+            "transaction": {
+                "description": "coffee",
+                "amount": 12.5,
+                "date": "2023-01-01T10:00:00Z",
+                "currency": "EUR",
+            },
+            "category": {"name": "Food"},
+            "transaction_id": "tx-1",
+            "existing_tags": [],
+        },
+    )
+
+    assert response.status_code == 502
+    assert response.json()["detail"] == (
+        "Firefly rejected the category update. The transaction was not saved."
+    )
+    mock_service.learn.assert_not_called()
+
 
 def test_get_categories_no_firefly() -> None:
     had_firefly = hasattr(app.state, "firefly")

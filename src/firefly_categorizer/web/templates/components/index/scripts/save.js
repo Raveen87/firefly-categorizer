@@ -25,6 +25,7 @@
             const transactionObj = JSON.parse(rawInput.value);
 
             try {
+                if (dom.errorAlert) dom.errorAlert.classList.add('hidden');
                 const response = await fetch('/learn', {
                     method: 'POST',
                     headers: {
@@ -39,49 +40,50 @@
                     })
                 });
 
-                if (response.ok) {
-                    const row = selectEl.closest('tr');
-                    row.className = 'table-row is-categorized is-processed';
-
-                    const dateCell = row.cells[0];
-                    if (dateCell && !dateCell.querySelector('.processed-indicator')) {
-                        const indicator = document.createElement('span');
-                        indicator.className = 'processed-indicator tooltip';
-                        indicator.setAttribute('data-tooltip', 'Already processed');
-                        indicator.setAttribute('aria-label', 'Already processed');
-                        indicator.setAttribute('role', 'img');
-                        indicator.textContent = '✓';
-                        dateCell.prepend(indicator);
-                    }
-
-                    const catCell = row.cells[3];
-                    catCell.textContent = '';
-                    const categorySpan = document.createElement('span');
-                    categorySpan.className = 'font-semibold';
-                    categorySpan.textContent = categoryName;
-                    const savedSpan = document.createElement('span');
-                    savedSpan.className = 'tag';
-                    savedSpan.textContent = 'Saved';
-                    catCell.append(categorySpan, document.createTextNode(' '), savedSpan);
-
-                    const confCell = row.cells[4];
-                    confCell.textContent = '-';
-
-                    btn.remove();
-                    selectEl.disabled = true;
-                } else {
-                    alert('Failed to update.');
-                    btn.disabled = false;
-                    selectEl.disabled = false;
-                    btn.innerHTML = 'Save';
-                    btn.className = 'btn btn-primary btn-xs';
+                if (!response.ok) {
+                    throw new Error(await readErrorMessage(response, 'Failed to save transaction.'));
                 }
+
+                const row = selectEl.closest('tr');
+                row.className = 'table-row is-categorized is-processed';
+
+                const dateCell = row.cells[0];
+                if (dateCell && !dateCell.querySelector('.processed-indicator')) {
+                    const indicator = document.createElement('span');
+                    indicator.className = 'processed-indicator tooltip';
+                    indicator.setAttribute('data-tooltip', 'Already processed');
+                    indicator.setAttribute('aria-label', 'Already processed');
+                    indicator.setAttribute('role', 'img');
+                    indicator.textContent = '✓';
+                    dateCell.prepend(indicator);
+                }
+
+                const catCell = row.cells[3];
+                catCell.textContent = '';
+                const categorySpan = document.createElement('span');
+                categorySpan.className = 'font-semibold';
+                categorySpan.textContent = categoryName;
+                const savedSpan = document.createElement('span');
+                savedSpan.className = 'tag';
+                savedSpan.textContent = 'Saved';
+                catCell.append(categorySpan, document.createTextNode(' '), savedSpan);
+
+                const confCell = row.cells[4];
+                confCell.textContent = '-';
+
+                btn.remove();
+                selectEl.disabled = true;
             } catch (error) {
                 console.error('Error:', error);
-                alert('An error occurred.');
                 btn.disabled = false;
                 selectEl.disabled = false;
                 btn.innerHTML = 'Save';
                 btn.className = 'btn btn-primary btn-xs';
+                if (dom.errorAlert && dom.errorText) {
+                    dom.errorText.textContent = error.message || 'Failed to save transaction.';
+                    dom.errorAlert.classList.remove('hidden');
+                } else {
+                    alert(error.message || 'Failed to save transaction.');
+                }
             }
         }

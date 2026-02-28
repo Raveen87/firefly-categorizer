@@ -11,7 +11,7 @@ from firefly_categorizer.api.dependencies import (
 from firefly_categorizer.api.schemas import LearnRequest
 from firefly_categorizer.core import settings
 from firefly_categorizer.domain.tags import merge_tags
-from firefly_categorizer.integration.firefly import FireflyClient
+from firefly_categorizer.integration.firefly import FireflyClient, FireflyConfigurationError
 from firefly_categorizer.logger import get_logger
 from firefly_categorizer.manager import CategorizerService
 from firefly_categorizer.services.training import TrainingManager
@@ -25,7 +25,10 @@ router = APIRouter()
 async def train_models(
     training_manager: Annotated[TrainingManager, Depends(get_training_manager)],
 ) -> dict:
-    return await training_manager.train_bulk()
+    try:
+        return await training_manager.train_bulk()
+    except FireflyConfigurationError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
 @router.get("/train-stream")
@@ -88,18 +91,40 @@ async def learn_transaction(
         source,
     )
 
-    service.learn(req.transaction, req.category)
-
     firefly_update_status = "skipped"
-    if firefly and req.transaction_id:
-        manual_tags = settings.get_env_tags("MANUAL_TAGS")
-        tags_payload = merge_tags(req.existing_tags, manual_tags) if manual_tags else None
-        success = await firefly.update_transaction(
-            req.transaction_id,
-            req.category.name,
-            tags=tags_payload,
-        )
-        firefly_update_status = "success" if success else "failed"
+    if req.transaction_id:
+        if not firefly:
+            raise HTTPException(
+                status_code=503,
+                detail="Firefly integration is unavailable. The transaction was not saved.",
+            )
+
+        try:
+            firefly.require_credentials()
+            manual_tags = settings.get_env_tags("MANUAL_TAGS")
+            tags_payload = merge_tags(req.existing_tags, manual_tags) if manual_tags else None
+            success = await firefly.update_transaction(
+                req.transaction_id,
+                req.category.name,
+                tags=tags_payload,
+            )
+        except FireflyConfigurationError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        except Exception as exc:
+            raise HTTPException(
+                status_code=502,
+                detail=f"Error updating transaction in Firefly: {exc!r}",
+            ) from exc
+
+        if not success:
+            raise HTTPException(
+                status_code=502,
+                detail="Firefly rejected the category update. The transaction was not saved.",
+            )
+
+        firefly_update_status = "success"
+
+    service.learn(req.transaction, req.category)
 
     return {
         "status": "success",

@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 
 from firefly_categorizer.api.dependencies import (
     get_firefly_optional,
@@ -8,7 +8,7 @@ from firefly_categorizer.api.dependencies import (
     get_service,
 )
 from firefly_categorizer.api.schemas import CategorizeRequest
-from firefly_categorizer.integration.firefly import FireflyClient
+from firefly_categorizer.integration.firefly import FireflyClient, FireflyConfigurationError
 from firefly_categorizer.manager import CategorizerService
 from firefly_categorizer.models import CategorizationResult
 from firefly_categorizer.services.categorization import CategorizationPipeline
@@ -26,7 +26,15 @@ async def categorize_transaction(
 ) -> CategorizationResult | None:
     valid_cats = None
     if firefly:
-        categories = await fetch_category_names(firefly)
+        try:
+            categories = await fetch_category_names(firefly, raise_on_error=True)
+        except FireflyConfigurationError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        except Exception as exc:
+            raise HTTPException(
+                status_code=502,
+                detail=f"Error fetching categories: {exc!r}",
+            ) from exc
         if categories:
             valid_cats = categories
 
@@ -39,4 +47,12 @@ async def get_categories(
 ) -> list[str]:
     if not firefly:
         return []
-    return await fetch_category_names(firefly)
+    try:
+        return await fetch_category_names(firefly, raise_on_error=True)
+    except FireflyConfigurationError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Error fetching categories: {exc!r}",
+        ) from exc

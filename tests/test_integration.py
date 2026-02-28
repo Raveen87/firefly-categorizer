@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from firefly_categorizer.integration.firefly import FireflyClient
+from firefly_categorizer.integration.firefly import FireflyClient, FireflyConfigurationError
 
 
 def _categories_response(categories: list[dict[str, Any]]) -> MagicMock:
@@ -60,6 +60,22 @@ async def test_firefly_yield_transactions() -> None:
 
     assert len(pages[1][0]) == 1
     assert pages[1][0][0]["id"] == "2"
+
+
+@pytest.mark.anyio
+async def test_firefly_get_transactions_requires_credentials() -> None:
+    client = FireflyClient(base_url=None, token=None)
+
+    with pytest.raises(FireflyConfigurationError, match="FIREFLY_URL and FIREFLY_TOKEN"):
+        await client.get_transactions()
+
+
+@pytest.mark.anyio
+async def test_firefly_yield_transactions_requires_credentials() -> None:
+    client = FireflyClient(base_url=None, token=None)
+
+    with pytest.raises(FireflyConfigurationError, match="FIREFLY_URL and FIREFLY_TOKEN"):
+        await client.yield_transactions().__anext__()
 
 
 @pytest.mark.anyio
@@ -307,6 +323,35 @@ async def test_training_stream_continues_after_client_disconnect() -> None:
     )
     assert training_manager.active is False
     assert mock_service.learn.call_count == 2
+
+
+@pytest.mark.anyio
+async def test_training_stream_reports_missing_firefly_credentials() -> None:
+    from firefly_categorizer.services.training import TrainingManager
+
+    mock_firefly = MagicMock()
+    mock_firefly.require_credentials.side_effect = FireflyConfigurationError(
+        "Firefly API credentials are missing. Configure FIREFLY_URL and FIREFLY_TOKEN."
+    )
+    mock_service = MagicMock()
+
+    training_manager = TrainingManager(
+        service=mock_service,
+        firefly=mock_firefly,
+        page_size=500,
+    )
+
+    stream = training_manager.stream()
+    event = await asyncio.wait_for(stream.__anext__(), timeout=1.0)
+    payload = json.loads(event.removeprefix("data: ").strip())
+
+    assert payload["stage"] == "error"
+    assert payload["message"] == (
+        "Firefly API credentials are missing. Configure FIREFLY_URL and FIREFLY_TOKEN."
+    )
+
+    with pytest.raises(StopAsyncIteration):
+        await asyncio.wait_for(stream.__anext__(), timeout=1.0)
 
 
 @pytest.mark.anyio
