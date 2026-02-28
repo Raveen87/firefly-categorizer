@@ -30,6 +30,24 @@ _CONFIG_KEYS = (
     "LOG_DIR",
 )
 
+_CONFIG_KEY_PATHS: dict[str, tuple[str, str]] = {
+    "FIREFLY_URL": ("firefly", "url"),
+    "FIREFLY_TOKEN": ("firefly", "token"),
+    "FIREFLY_CATEGORIES_TTL": ("firefly", "categoriesTtl"),
+    "OPENAI_API_KEY": ("openai", "apiKey"),
+    "OPENAI_MODEL": ("openai", "model"),
+    "OPENAI_BASE_URL": ("openai", "baseUrl"),
+    "AUTO_APPROVE_THRESHOLD": ("automation", "autoApproveThreshold"),
+    "TRAINING_PAGE_SIZE": ("automation", "trainingPageSize"),
+    "MANUAL_TAGS": ("automation", "manualTags"),
+    "AUTO_APPROVE_TAGS": ("automation", "autoApproveTags"),
+    "DATA_DIR": ("storage", "dataDir"),
+    "LOG_DIR": ("storage", "logDir"),
+    "LOG_LEVEL": ("logging", "level"),
+}
+_CONFIG_PATH_TO_KEY = {path: key for key, path in _CONFIG_KEY_PATHS.items()}
+_CONFIG_ROOT_KEYS = {path[0] for path in _CONFIG_KEY_PATHS.values()}
+
 
 def _resolve_dotenv_path() -> str | None:
     config_dir = os.getenv("CONFIG_DIR")
@@ -91,11 +109,15 @@ def read_config_file(path: str | None) -> dict[str, str]:
         return {}
 
     values: dict[str, str] = {}
+    current_section: str | None = None
     with open(path, encoding="utf-8") as handle:
         for line in handle:
+            indent = len(line) - len(line.lstrip(" "))
             stripped = line.strip()
             if not stripped or stripped.startswith("#"):
                 continue
+            if indent == 0:
+                current_section = None
             if ":" not in stripped:
                 continue
             key, raw_value = stripped.split(":", 1)
@@ -104,10 +126,16 @@ def read_config_file(path: str | None) -> dict[str, str]:
                 continue
             cleaned = _strip_inline_comment(raw_value).strip()
             if not cleaned:
+                if indent == 0 and key in _CONFIG_ROOT_KEYS:
+                    current_section = key
                 continue
             value = _unquote_value(cleaned)
             if value:
-                values[key] = value
+                if current_section is None:
+                    continue
+                mapped_key = _CONFIG_PATH_TO_KEY.get((current_section, key))
+                if mapped_key:
+                    values[mapped_key] = value
     return values
 
 

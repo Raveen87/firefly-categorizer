@@ -1,42 +1,47 @@
 # Firefly Categorizer configuration
 # These settings only take effect when the same environment variable is not set.
-# Remove the leading "#" to enable a setting here.
+# Environment variables and .env entries still override config.yaml values.
 
-# Firefly III URL (no trailing slash)
-# FIREFLY_URL:
+firefly:
+  # Base URL for your Firefly III instance (no trailing slash).
+  url:
 
-# Firefly III Personal Access Token (Profile -> OAuth -> Personal Access Tokens)
-# FIREFLY_TOKEN:
+  # Personal Access Token from Firefly III (Profile -> OAuth).
+  token:
 
-# Cache TTL for category list (seconds, 0 disables caching)
-# FIREFLY_CATEGORIES_TTL:
+  # Seconds to cache category list from Firefly III. 0 disables caching. Minimum: 0. Step: 0.01.
+  categoriesTtl:
 
-# OpenAI API Key (Optional, for LLM fallback)
-# OPENAI_API_KEY:
+openai:
+  # API key used for optional LLM fallback.
+  apiKey:
 
-# OpenAI Model (Optional, defaults to gpt-3.5-turbo)
-# OPENAI_MODEL:
+  # Model name for the OpenAI-compatible client.
+  model:
 
-# OpenAI Base URL (Optional, for OpenAI-compatible APIs)
-# OPENAI_BASE_URL:
+  # Override OpenAI base URL for compatible providers.
+  baseUrl:
 
-# Auto-approve threshold (0-1, 0 disables)
-# AUTO_APPROVE_THRESHOLD:
+automation:
+  # Confidence threshold (0-1). 0 disables auto-approve. Allowed range: 0 to 1. Step: 0.01.
+  autoApproveThreshold:
 
-# Training page size (minimum 1)
-# TRAINING_PAGE_SIZE:
+  # Number of transactions fetched per training page. Minimum: 1.
+  trainingPageSize:
 
-# Tags to apply when saving manually (comma-separated)
-# MANUAL_TAGS:
+  # Comma-separated tags applied on manual save.
+  manualTags:
 
-# Tags to apply when auto-approving (comma-separated)
-# AUTO_APPROVE_TAGS:
+  # Comma-separated tags applied on auto-approve.
+  autoApproveTags:
 
-# Data directory (memory.json, tfidf.pkl)
-# DATA_DIR:
+storage:
+  # Directory for memory and model artifacts.
+  dataDir:
 
-# Log directory (app.log)
-# LOG_DIR:
+  # Directory for application logs (app.log).
+  logDir:
 
-# Log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
-# LOG_LEVEL:
+logging:
+  # Logging verbosity for the application. Allowed values: DEBUG, INFO, WARNING, ERROR, CRITICAL.
+  level:

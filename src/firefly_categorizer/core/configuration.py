@@ -1,4 +1,5 @@
 import os
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, Literal
 
@@ -13,6 +14,7 @@ logger = get_logger(__name__)
 @dataclass(frozen=True)
 class ConfigField:
     key: str
+    yaml_path: tuple[str, str]
     label: str
     description: str
     placeholder: str
@@ -30,6 +32,7 @@ class ConfigField:
 CONFIG_FIELDS: tuple[ConfigField, ...] = (
     ConfigField(
         key="FIREFLY_URL",
+        yaml_path=("firefly", "url"),
         label="Firefly URL",
         description="Base URL for your Firefly III instance (no trailing slash).",
         placeholder="http://localhost:8080",
@@ -38,6 +41,7 @@ CONFIG_FIELDS: tuple[ConfigField, ...] = (
     ),
     ConfigField(
         key="FIREFLY_TOKEN",
+        yaml_path=("firefly", "token"),
         label="Firefly Token",
         description="Personal Access Token from Firefly III (Profile -> OAuth).",
         placeholder="ey...",
@@ -47,6 +51,7 @@ CONFIG_FIELDS: tuple[ConfigField, ...] = (
     ),
     ConfigField(
         key="FIREFLY_CATEGORIES_TTL",
+        yaml_path=("firefly", "categoriesTtl"),
         label="Categories Cache TTL",
         description="Seconds to cache category list from Firefly III. 0 disables caching.",
         placeholder="60",
@@ -58,6 +63,7 @@ CONFIG_FIELDS: tuple[ConfigField, ...] = (
     ),
     ConfigField(
         key="OPENAI_API_KEY",
+        yaml_path=("openai", "apiKey"),
         label="OpenAI API Key",
         description="API key used for optional LLM fallback.",
         placeholder="sk-...",
@@ -67,6 +73,7 @@ CONFIG_FIELDS: tuple[ConfigField, ...] = (
     ),
     ConfigField(
         key="OPENAI_MODEL",
+        yaml_path=("openai", "model"),
         label="OpenAI Model",
         description="Model name for the OpenAI-compatible client.",
         placeholder="gpt-3.5-turbo",
@@ -75,6 +82,7 @@ CONFIG_FIELDS: tuple[ConfigField, ...] = (
     ),
     ConfigField(
         key="OPENAI_BASE_URL",
+        yaml_path=("openai", "baseUrl"),
         label="OpenAI Base URL",
         description="Override OpenAI base URL for compatible providers.",
         placeholder="http://localhost:11434/v1",
@@ -83,6 +91,7 @@ CONFIG_FIELDS: tuple[ConfigField, ...] = (
     ),
     ConfigField(
         key="AUTO_APPROVE_THRESHOLD",
+        yaml_path=("automation", "autoApproveThreshold"),
         label="Auto-approve Threshold",
         description="Confidence threshold (0-1). 0 disables auto-approve.",
         placeholder="1",
@@ -95,6 +104,7 @@ CONFIG_FIELDS: tuple[ConfigField, ...] = (
     ),
     ConfigField(
         key="TRAINING_PAGE_SIZE",
+        yaml_path=("automation", "trainingPageSize"),
         label="Training Page Size",
         description="Number of transactions fetched per training page.",
         placeholder="50",
@@ -106,6 +116,7 @@ CONFIG_FIELDS: tuple[ConfigField, ...] = (
     ),
     ConfigField(
         key="MANUAL_TAGS",
+        yaml_path=("automation", "manualTags"),
         label="Manual Tags",
         description="Comma-separated tags applied on manual save.",
         placeholder="firefly-categorizer",
@@ -114,6 +125,7 @@ CONFIG_FIELDS: tuple[ConfigField, ...] = (
     ),
     ConfigField(
         key="AUTO_APPROVE_TAGS",
+        yaml_path=("automation", "autoApproveTags"),
         label="Auto-approve Tags",
         description="Comma-separated tags applied on auto-approve.",
         placeholder="firefly-categorizer,auto-approved",
@@ -122,6 +134,7 @@ CONFIG_FIELDS: tuple[ConfigField, ...] = (
     ),
     ConfigField(
         key="DATA_DIR",
+        yaml_path=("storage", "dataDir"),
         label="Data Directory",
         description="Directory for memory and model artifacts.",
         placeholder="/app/data",
@@ -131,6 +144,7 @@ CONFIG_FIELDS: tuple[ConfigField, ...] = (
     ),
     ConfigField(
         key="LOG_DIR",
+        yaml_path=("storage", "logDir"),
         label="Log Directory",
         description="Directory for application logs (app.log).",
         placeholder="/app/logs",
@@ -140,6 +154,7 @@ CONFIG_FIELDS: tuple[ConfigField, ...] = (
     ),
     ConfigField(
         key="LOG_LEVEL",
+        yaml_path=("logging", "level"),
         label="Log Level",
         description="Logging verbosity for the application.",
         placeholder="INFO",
@@ -149,50 +164,6 @@ CONFIG_FIELDS: tuple[ConfigField, ...] = (
         restart_required=True,
     ),
 )
-
-CONFIG_TEMPLATE = """# Firefly Categorizer configuration
-# These settings only take effect when the same environment variable is not set.
-# Remove the leading "#" to enable a setting here.
-
-# Firefly III URL (no trailing slash)
-# FIREFLY_URL:
-
-# Firefly III Personal Access Token (Profile -> OAuth -> Personal Access Tokens)
-# FIREFLY_TOKEN:
-
-# Cache TTL for category list (seconds, 0 disables caching)
-# FIREFLY_CATEGORIES_TTL:
-
-# OpenAI API Key (Optional, for LLM fallback)
-# OPENAI_API_KEY:
-
-# OpenAI Model (Optional, defaults to gpt-3.5-turbo)
-# OPENAI_MODEL:
-
-# OpenAI Base URL (Optional, for OpenAI-compatible APIs)
-# OPENAI_BASE_URL:
-
-# Auto-approve threshold (0-1, 0 disables)
-# AUTO_APPROVE_THRESHOLD:
-
-# Training page size (minimum 1)
-# TRAINING_PAGE_SIZE:
-
-# Tags to apply when saving manually (comma-separated)
-# MANUAL_TAGS:
-
-# Tags to apply when auto-approving (comma-separated)
-# AUTO_APPROVE_TAGS:
-
-# Data directory (memory.json, tfidf.pkl)
-# DATA_DIR:
-
-# Log directory (app.log)
-# LOG_DIR:
-
-# Log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
-# LOG_LEVEL:
-"""
 
 DOCKER_UI_LOCKED_KEYS: tuple[str, ...] = ("DATA_DIR", "LOG_DIR", "LOG_LEVEL")
 
@@ -221,6 +192,62 @@ def _group_fields() -> list[tuple[str, list[ConfigField]]]:
             categories.append(field.category)
         grouped[field.category].append(field)
     return [(category, grouped[category]) for category in categories]
+
+
+def _group_yaml_fields() -> list[tuple[str, list[ConfigField]]]:
+    sections: list[str] = []
+    grouped: dict[str, list[ConfigField]] = {}
+    for field in CONFIG_FIELDS:
+        section = field.yaml_path[0]
+        if section not in grouped:
+            grouped[section] = []
+            sections.append(section)
+        grouped[section].append(field)
+    return [(section, grouped[section]) for section in sections]
+
+
+def _yaml_comment(field: ConfigField) -> str:
+    details: list[str] = []
+    if field.options:
+        details.append(f"Allowed values: {', '.join(field.options)}.")
+    elif field.min_value is not None and field.max_value is not None:
+        details.append(f"Allowed range: {field.min_value:g} to {field.max_value:g}.")
+    elif field.min_value is not None:
+        details.append(f"Minimum: {field.min_value:g}.")
+
+    if field.step is not None and field.value_type == "float":
+        details.append(f"Step: {field.step:g}.")
+
+    if not details:
+        return field.description
+    return f"{field.description} {' '.join(details)}"
+
+
+def _render_config_lines(values: Mapping[str, str]) -> list[str]:
+    lines = [
+        "# Firefly Categorizer configuration",
+        "# These settings only take effect when the same environment variable is not set.",
+        "# Environment variables and .env entries still override config.yaml values.",
+        "",
+    ]
+
+    for section, fields in _group_yaml_fields():
+        lines.append(f"{section}:")
+        for field in fields:
+            lines.append(f"  # {_yaml_comment(field)}")
+            value = values.get(field.key, "")
+            yaml_key = field.yaml_path[1]
+            formatted = _format_yaml_value(value)
+            lines.append(f"  {yaml_key}: {formatted}" if value else f"  {yaml_key}:")
+            lines.append("")
+
+        if lines[-1] == "":
+            lines.pop()
+        lines.append("")
+
+    if lines[-1] == "":
+        lines.pop()
+    return lines
 
 
 def build_config_context(
@@ -355,32 +382,9 @@ def _write_config_file(updates: dict[str, str]) -> None:
     config_dir = os.path.dirname(config_path)
     if config_dir:
         os.makedirs(config_dir, exist_ok=True)
-    lines: list[str]
-    if os.path.exists(config_path):
-        with open(config_path, encoding="utf-8") as handle:
-            lines = handle.read().splitlines()
-    else:
-        lines = [str(line) for line in CONFIG_TEMPLATE.splitlines()]
-
-    key_indexes: dict[str, int] = {}
-    for index, line in enumerate(lines):
-        stripped = line.strip()
-        if not stripped or ":" not in stripped:
-            continue
-        candidate = stripped
-        if candidate.startswith("#"):
-            candidate = candidate[1:].lstrip()
-        key = candidate.split(":", 1)[0].strip()
-        if key in updates and key not in key_indexes:
-            key_indexes[key] = index
-
-    for key, value in updates.items():
-        formatted = _format_yaml_value(value)
-        new_line = f"{key}: {formatted}" if value else f"# {key}:"
-        if key in key_indexes:
-            lines[key_indexes[key]] = new_line
-        else:
-            lines.append(new_line)
+    values = settings.read_config_file(config_path)
+    values.update(updates)
+    lines = _render_config_lines(values)
 
     with open(config_path, "w", encoding="utf-8") as handle:
         handle.write("\n".join(lines).rstrip("\n") + "\n")
@@ -456,3 +460,6 @@ def _format_yaml_value(value: str) -> str:
         return value
     escaped = value.replace("\\", "\\\\").replace('"', '\\"')
     return f"\"{escaped}\""
+
+
+CONFIG_TEMPLATE = "\n".join(_render_config_lines({})) + "\n"
