@@ -32,8 +32,20 @@ Environment variables take precedence and lock the corresponding field in the UI
 
 ### Option B: config.yaml
 
-1. Open `config/config.yaml` and uncomment the settings you want to use.
+1. Open `config/config.yaml` and set the lowerCamelCase YAML values you want to use.
 2. Values in `config.yaml` only apply when the same environment variable (or `.env` entry) is not set.
+3. Example:
+
+   ```yaml
+   firefly:
+     url: http://192.168.1.100:8080
+     token: ey...
+
+   automation:
+     autoApproveThreshold: 0.9
+     manualTags: firefly-categorizer
+     autoApproveTags: firefly-categorizer,auto-approved
+   ```
 
 ## Running
 
