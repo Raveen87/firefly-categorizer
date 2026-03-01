@@ -29,6 +29,7 @@ def _parse_env_float(name: str, default: float) -> float:
         logger.warning("[ENV] Invalid %s='%s', using default %.2f.", name, raw, default)
         return default
 
+
 def _safe_timestamp(value: str | None) -> float:
     if not value:
         return 0.0
@@ -36,6 +37,7 @@ def _safe_timestamp(value: str | None) -> float:
         return datetime.fromisoformat(value.replace("Z", "+00:00")).timestamp()
     except ValueError:
         return 0.0
+
 
 def _sort_transactions_by_created_at(transactions: list[dict[str, Any]]) -> None:
     def sort_key(tx: dict[str, Any]) -> tuple[float, str]:
@@ -51,6 +53,7 @@ def _sort_transactions_by_created_at(transactions: list[dict[str, Any]]) -> None
         return (_safe_timestamp(created_at), str(tx_id) if tx_id is not None else "")
 
     transactions.sort(key=sort_key)
+
 
 class FireflyClient:
     def __init__(
@@ -97,9 +100,20 @@ class FireflyClient:
             "Firefly API credentials are missing. Configure FIREFLY_URL and FIREFLY_TOKEN."
         )
 
-    def refresh(self, base_url: str | None = None, token: str | None = None) -> None:
+    def refresh(
+        self,
+        base_url: str | None = None,
+        token: str | None = None,
+        http_timeout: float | None = None,
+    ) -> None:
         base_value = base_url if base_url is not None else os.getenv("FIREFLY_URL")
         token_value = token if token is not None else os.getenv("FIREFLY_TOKEN")
+        timeout_value = http_timeout
+        if timeout_value is None:
+            timeout_value = _parse_env_float(
+                "FIREFLY_HTTP_TIMEOUT",
+                DEFAULT_HTTP_TIMEOUT_SECONDS,
+            )
         self.base_url = base_value or None
         self.token = token_value or None
         self.headers = {
@@ -113,10 +127,33 @@ class FireflyClient:
             "FIREFLY_CATEGORIES_TTL",
             DEFAULT_CATEGORIES_CACHE_TTL_SECONDS,
         )
+        refreshed_timeout = max(0.0, timeout_value)
+        if refreshed_timeout != self._http_timeout:
+            self._http_timeout = refreshed_timeout
+            self._replace_client()
+        else:
+            self._http_timeout = refreshed_timeout
 
     async def aclose(self) -> None:
         if self._client and not self._client.is_closed:
             await self._client.aclose()
+
+    def _replace_client(self) -> None:
+        client = self._client
+        self._client = None
+        if client is None or client.is_closed:
+            return
+        try:
+            asyncio.get_running_loop().create_task(client.aclose())
+        except RuntimeError:
+            logger.debug("[FIREFLY] No running event loop; closing async client synchronously.")
+            try:
+                asyncio.run(client.aclose())
+            except RuntimeError:
+                logger.warning(
+                    "[FIREFLY] Failed to close async client with asyncio.run().",
+                    exc_info=True,
+                )
 
     async def _get_client(self) -> httpx.AsyncClient:
         # Fast path: client already exists and is open

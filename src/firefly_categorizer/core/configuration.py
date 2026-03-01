@@ -50,6 +50,18 @@ CONFIG_FIELDS: tuple[ConfigField, ...] = (
         sensitive=True,
     ),
     ConfigField(
+        key="FIREFLY_HTTP_TIMEOUT",
+        yaml_path=("firefly", "httpTimeout"),
+        label="HTTP Timeout",
+        description="Seconds before Firefly III API requests time out.",
+        placeholder="60",
+        input_type="number",
+        category="Firefly III",
+        value_type="float",
+        min_value=0,
+        step=0.01,
+    ),
+    ConfigField(
         key="FIREFLY_CATEGORIES_TTL",
         yaml_path=("firefly", "categoriesTtl"),
         label="Categories Cache TTL",
@@ -407,7 +419,13 @@ def apply_runtime_updates(app: Any, updates: dict[str, str]) -> None:
     if state is None:
         return
 
-    if {"FIREFLY_URL", "FIREFLY_TOKEN"} & updates.keys():
+    firefly_update_keys = {
+        "FIREFLY_URL",
+        "FIREFLY_TOKEN",
+        "FIREFLY_HTTP_TIMEOUT",
+        "FIREFLY_CATEGORIES_TTL",
+    }
+    if firefly_update_keys & updates.keys():
         _refresh_firefly(getattr(state, "firefly", None))
 
     if {"OPENAI_API_KEY", "OPENAI_MODEL", "OPENAI_BASE_URL"} & updates.keys():

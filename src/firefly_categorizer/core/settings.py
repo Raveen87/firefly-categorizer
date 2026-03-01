@@ -15,9 +15,9 @@ _CONFIG_FILE_VALUES: dict[str, str] = {}
 _EXTERNAL_ENV_KEYS: set[str] = set()
 
 _CONFIG_KEYS = (
-    "LOG_LEVEL",
     "FIREFLY_URL",
     "FIREFLY_TOKEN",
+    "FIREFLY_HTTP_TIMEOUT",
     "FIREFLY_CATEGORIES_TTL",
     "OPENAI_API_KEY",
     "OPENAI_MODEL",
@@ -28,11 +28,13 @@ _CONFIG_KEYS = (
     "AUTO_APPROVE_TAGS",
     "DATA_DIR",
     "LOG_DIR",
+    "LOG_LEVEL",
 )
 
 _CONFIG_KEY_PATHS: dict[str, tuple[str, str]] = {
     "FIREFLY_URL": ("firefly", "url"),
     "FIREFLY_TOKEN": ("firefly", "token"),
+    "FIREFLY_HTTP_TIMEOUT": ("firefly", "httpTimeout"),
     "FIREFLY_CATEGORIES_TTL": ("firefly", "categoriesTtl"),
     "OPENAI_API_KEY": ("openai", "apiKey"),
     "OPENAI_MODEL": ("openai", "model"),
@@ -227,6 +229,7 @@ _ENV_KEYS_TO_LOG = (
     "LOG_LEVEL",
     "FIREFLY_URL",
     "FIREFLY_TOKEN",
+    "FIREFLY_HTTP_TIMEOUT",
     "FIREFLY_CATEGORIES_TTL",
     "OPENAI_API_KEY",
     "OPENAI_MODEL",
@@ -235,6 +238,8 @@ _ENV_KEYS_TO_LOG = (
     "TRAINING_PAGE_SIZE",
     "MANUAL_TAGS",
     "AUTO_APPROVE_TAGS",
+    "DATA_DIR",
+    "LOG_DIR",
 )
 
 
