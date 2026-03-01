@@ -3,6 +3,24 @@ from pathlib import Path
 from firefly_categorizer.core import configuration, settings
 
 
+def _env_example_keys() -> set[str]:
+    env_example_path = Path(__file__).resolve().parents[1] / ".env.example"
+    env_example = env_example_path.read_text(encoding="utf-8").splitlines()
+    keys: set[str] = set()
+    for line in env_example:
+        stripped = line.strip()
+        if not stripped:
+            continue
+        if stripped.startswith("# "):
+            stripped = stripped[2:]
+        if "=" not in stripped:
+            continue
+        key = stripped.split("=", 1)[0].strip()
+        if key.isupper():
+            keys.add(key)
+    return keys
+
+
 def test_build_config_context_includes_docker_locked_storage_fields(
     monkeypatch,
 ) -> None:
@@ -44,6 +62,7 @@ def test_read_config_file_supports_nested_lower_camel_yaml(tmp_path: Path) -> No
                 "firefly:",
                 "  url: http://localhost:8080",
                 "  token: secret-token",
+                "  httpTimeout: 12.5",
                 "automation:",
                 "  autoApproveThreshold: 0.9",
                 "  manualTags: firefly-categorizer,reviewed",
@@ -60,6 +79,7 @@ def test_read_config_file_supports_nested_lower_camel_yaml(tmp_path: Path) -> No
     assert values == {
         "FIREFLY_URL": "http://localhost:8080",
         "FIREFLY_TOKEN": "secret-token",
+        "FIREFLY_HTTP_TIMEOUT": "12.5",
         "AUTO_APPROVE_THRESHOLD": "0.9",
         "MANUAL_TAGS": "firefly-categorizer,reviewed",
         "LOG_LEVEL": "DEBUG",
@@ -95,6 +115,7 @@ def test_write_config_file_emits_nested_lower_camel_yaml(
     configuration._write_config_file(  # noqa: SLF001
         {
             "FIREFLY_URL": "http://localhost:8080",
+            "FIREFLY_HTTP_TIMEOUT": "12.5",
             "OPENAI_MODEL": "gpt-4o-mini",
             "AUTO_APPROVE_THRESHOLD": "0.9",
             "LOG_LEVEL": "INFO",
@@ -108,6 +129,10 @@ def test_write_config_file_emits_nested_lower_camel_yaml(
         in rendered
     )
     assert (
+        "  # Seconds before Firefly III API requests time out. Minimum: 0. Step: 0.01.\n"
+        "  httpTimeout: 12.5" in rendered
+    )
+    assert (
         "openai:\n  # API key used for optional LLM fallback.\n  apiKey:\n\n"
         "  # Model name for the OpenAI-compatible client.\n  model: gpt-4o-mini" in rendered
     )
@@ -119,3 +144,19 @@ def test_write_config_file_emits_nested_lower_camel_yaml(
         "logging:\n  # Logging verbosity for the application. Allowed values: DEBUG, INFO, WARNING, ERROR, CRITICAL.\n"
         "  level: INFO" in rendered
     )
+
+
+def test_config_registry_matches_settings_keys() -> None:
+    assert configuration.get_config_keys() == settings._CONFIG_KEYS  # noqa: SLF001
+
+
+def test_config_registry_matches_yaml_paths() -> None:
+    field_paths = {field.key: field.yaml_path for field in configuration.CONFIG_FIELDS}
+
+    assert field_paths == settings._CONFIG_KEY_PATHS  # noqa: SLF001
+
+
+def test_env_example_lists_all_config_keys() -> None:
+    documented_keys = _env_example_keys()
+
+    assert set(configuration.get_config_keys()).issubset(documented_keys)

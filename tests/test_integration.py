@@ -63,7 +63,11 @@ async def test_firefly_yield_transactions() -> None:
 
 
 @pytest.mark.anyio
-async def test_firefly_get_transactions_requires_credentials() -> None:
+async def test_firefly_get_transactions_requires_credentials(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("FIREFLY_URL", raising=False)
+    monkeypatch.delenv("FIREFLY_TOKEN", raising=False)
     client = FireflyClient(base_url=None, token=None)
 
     with pytest.raises(FireflyConfigurationError, match="FIREFLY_URL and FIREFLY_TOKEN"):
@@ -71,7 +75,11 @@ async def test_firefly_get_transactions_requires_credentials() -> None:
 
 
 @pytest.mark.anyio
-async def test_firefly_yield_transactions_requires_credentials() -> None:
+async def test_firefly_yield_transactions_requires_credentials(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("FIREFLY_URL", raising=False)
+    monkeypatch.delenv("FIREFLY_TOKEN", raising=False)
     client = FireflyClient(base_url=None, token=None)
 
     with pytest.raises(FireflyConfigurationError, match="FIREFLY_URL and FIREFLY_TOKEN"):
@@ -178,6 +186,58 @@ async def test_firefly_categories_cache_stale_fallback_on_error() -> None:
     assert first == categories
     assert second == categories
     assert mock_client.get.call_count == 2
+
+
+def test_firefly_refresh_updates_timeout_before_replacing_client() -> None:
+    client = FireflyClient(
+        base_url="http://test",
+        token="token",
+        http_timeout=10.0,
+    )
+    seen_timeouts: list[float] = []
+
+    def fake_replace_client() -> None:
+        seen_timeouts.append(client._http_timeout)  # noqa: SLF001
+
+    client._replace_client = fake_replace_client  # type: ignore[method-assign]  # noqa: SLF001
+
+    client.refresh(http_timeout=25.0)
+
+    assert seen_timeouts == [25.0]
+    assert client._http_timeout == 25.0  # noqa: SLF001
+
+
+def test_firefly_replace_client_closes_synchronously_without_event_loop(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client = FireflyClient(base_url="http://test", token="token")
+    mock_http_client = MagicMock()
+    mock_http_client.is_closed = False
+
+    async def close_client() -> None:
+        return None
+
+    mock_http_client.aclose.return_value = close_client()
+    client._client = mock_http_client  # noqa: SLF001
+
+    monkeypatch.setattr(
+        "firefly_categorizer.integration.firefly.asyncio.get_running_loop",
+        MagicMock(side_effect=RuntimeError),
+    )
+
+    captured: dict[str, Any] = {}
+
+    def fake_run(coro: Any) -> None:
+        captured["coro"] = coro
+        coro.close()
+
+    monkeypatch.setattr("firefly_categorizer.integration.firefly.asyncio.run", fake_run)
+
+    client._replace_client()  # noqa: SLF001
+
+    assert client._client is None  # noqa: SLF001
+    assert captured["coro"] is not None
+
 
 @pytest.mark.anyio
 async def test_train_endpoint_chunking() -> None:
