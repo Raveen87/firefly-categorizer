@@ -1,5 +1,4 @@
 import asyncio
-import os
 from collections.abc import AsyncGenerator
 from datetime import datetime
 from time import monotonic
@@ -7,6 +6,7 @@ from typing import Any
 
 import httpx
 
+from firefly_categorizer.core import settings
 from firefly_categorizer.logger import get_logger
 
 logger = get_logger(__name__)
@@ -17,17 +17,6 @@ DEFAULT_HTTP_TIMEOUT_SECONDS = 60.0
 
 class FireflyConfigurationError(RuntimeError):
     """Raised when Firefly API credentials are missing."""
-
-
-def _parse_env_float(name: str, default: float) -> float:
-    raw = os.getenv(name)
-    if not raw:
-        return default
-    try:
-        return float(raw)
-    except ValueError:
-        logger.warning("[ENV] Invalid %s='%s', using default %.2f.", name, raw, default)
-        return default
 
 
 def _safe_timestamp(value: str | None) -> float:
@@ -64,8 +53,8 @@ class FireflyClient:
         categories_cache_ttl: float | None = None,
         http_timeout: float | None = None,
     ):
-        self.base_url = base_url or os.getenv("FIREFLY_URL")
-        self.token = token or os.getenv("FIREFLY_TOKEN")
+        self.base_url = base_url or settings.get_env_url("FIREFLY_URL")
+        self.token = token or settings.get_env_text("FIREFLY_TOKEN")
         self.headers = {
             "Authorization": f"Bearer {self.token}",
             "Content-Type": "application/json",
@@ -77,16 +66,18 @@ class FireflyClient:
         self._categories_cache_expires_at = 0.0
         cache_ttl = categories_cache_ttl
         if cache_ttl is None:
-            cache_ttl = _parse_env_float(
+            cache_ttl = settings.get_env_float(
                 "FIREFLY_CATEGORIES_TTL",
                 DEFAULT_CATEGORIES_CACHE_TTL_SECONDS,
+                min_value=0.0,
             )
         self._categories_cache_ttl = max(0.0, cache_ttl)
         timeout = http_timeout
         if timeout is None:
-            timeout = _parse_env_float(
+            timeout = settings.get_env_float(
                 "FIREFLY_HTTP_TIMEOUT",
                 DEFAULT_HTTP_TIMEOUT_SECONDS,
+                min_value=0.0,
             )
         self._http_timeout = max(0.0, timeout)
         logger.info("[INIT] FireflyClient initialized with timeout=%.2fs", self._http_timeout)
@@ -106,13 +97,14 @@ class FireflyClient:
         token: str | None = None,
         http_timeout: float | None = None,
     ) -> None:
-        base_value = base_url if base_url is not None else os.getenv("FIREFLY_URL")
-        token_value = token if token is not None else os.getenv("FIREFLY_TOKEN")
+        base_value = base_url if base_url is not None else settings.get_env_url("FIREFLY_URL")
+        token_value = token if token is not None else settings.get_env_text("FIREFLY_TOKEN")
         timeout_value = http_timeout
         if timeout_value is None:
-            timeout_value = _parse_env_float(
+            timeout_value = settings.get_env_float(
                 "FIREFLY_HTTP_TIMEOUT",
                 DEFAULT_HTTP_TIMEOUT_SECONDS,
+                min_value=0.0,
             )
         self.base_url = base_value or None
         self.token = token_value or None
@@ -123,9 +115,10 @@ class FireflyClient:
         }
         self._categories_cache = None
         self._categories_cache_expires_at = 0.0
-        self._categories_cache_ttl = _parse_env_float(
+        self._categories_cache_ttl = settings.get_env_float(
             "FIREFLY_CATEGORIES_TTL",
             DEFAULT_CATEGORIES_CACHE_TTL_SECONDS,
+            min_value=0.0,
         )
         refreshed_timeout = max(0.0, timeout_value)
         if refreshed_timeout != self._http_timeout:

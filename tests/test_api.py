@@ -132,6 +132,43 @@ def test_get_transactions_with_predict(
     assert data["transactions"][0]["prediction"]["category"]["name"] == "Food"
 
 
+def test_get_transactions_with_invalid_auto_approve_threshold(
+    mock_firefly: AsyncMock,
+    mock_service: MagicMock,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("AUTO_APPROVE_THRESHOLD", "not-a-number")
+    mock_firefly.get_categories.return_value = [{"attributes": {"name": "Food"}}]
+    mock_firefly.get_transactions.return_value = {
+        "data": [
+            {
+                "id": "1",
+                "attributes": {
+                    "transactions": [{
+                        "description": "uncategorized tx",
+                        "amount": "10.00",
+                        "date": "2023-01-01T10:00:00Z",
+                        "category_name": None
+                    }]
+                }
+            }
+        ],
+        "meta": {"total": 1}
+    }
+    mock_service.categorize.return_value = CategorizationResult(
+        category=Category(name="Food"),
+        confidence=0.9,
+        source="mock",
+    )
+
+    response = client.get("/api/transactions?predict=true")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data["transactions"]) == 1
+    assert data["transactions"][0]["prediction"] is not None
+
+
 def test_get_transactions_missing_firefly_credentials(mock_firefly: AsyncMock) -> None:
     mock_firefly.get_categories.side_effect = FireflyConfigurationError(
         "Firefly API credentials are missing. Configure FIREFLY_URL and FIREFLY_TOKEN."

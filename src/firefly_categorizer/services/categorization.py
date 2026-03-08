@@ -68,7 +68,12 @@ class CategorizationPipeline:
         log_low_confidence: bool = False,
     ) -> tuple[str | None, float]:
         if threshold is None:
-            threshold = settings.get_env_float("AUTO_APPROVE_THRESHOLD", 0.0)
+            threshold = settings.get_env_float(
+                "AUTO_APPROVE_THRESHOLD",
+                0.0,
+                min_value=0.0,
+                max_value=1.0,
+            )
         if threshold <= 0:
             if log_disabled:
                 logger.info(

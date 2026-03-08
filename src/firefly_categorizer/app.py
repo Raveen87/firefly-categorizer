@@ -24,10 +24,10 @@ def create_app() -> FastAPI:
         logger.info("Initializing services...")
         settings.log_environment()
 
-        if not os.getenv("FIREFLY_URL") or not os.getenv("FIREFLY_TOKEN"):
+        if not settings.get_env_url("FIREFLY_URL") or not settings.get_env_text("FIREFLY_TOKEN"):
             logger.warning("FIREFLY_URL or FIREFLY_TOKEN not set. Firefly integration will be disabled.")
 
-        if not os.getenv("OPENAI_API_KEY"):
+        if not settings.get_env_text("OPENAI_API_KEY"):
             logger.info("OPENAI_API_KEY not set. OpenAI integration will be disabled.")
 
         service = CategorizerService(data_dir=settings.DATA_DIR)

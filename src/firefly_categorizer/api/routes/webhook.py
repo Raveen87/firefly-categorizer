@@ -79,7 +79,12 @@ async def firefly_webhook(
         logger.info("[WEBHOOK] No prediction available for transaction %s; skipping.", tx_id)
         return {"status": "ignored", "reason": "no prediction"}
 
-    auto_approve_threshold = settings.get_env_float("AUTO_APPROVE_THRESHOLD", 0.0)
+    auto_approve_threshold = settings.get_env_float(
+        "AUTO_APPROVE_THRESHOLD",
+        0.0,
+        min_value=0.0,
+        max_value=1.0,
+    )
     reason, threshold_value = pipeline.auto_approval_reason(
         tx_id,
         prediction,
