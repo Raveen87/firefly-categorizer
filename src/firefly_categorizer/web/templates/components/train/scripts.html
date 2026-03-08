@@ -183,7 +183,7 @@
         }
     }
 
-    function closeTrainMenu() {
+    function closeTrainMenu(restoreFocus = false) {
         const wrapper = document.getElementById('train-menu-wrapper');
         const menu = document.getElementById('train-menu');
         const btn = document.getElementById('train-menu-btn');
@@ -193,6 +193,9 @@
         menu.classList.add('hidden');
         btn.setAttribute('aria-expanded', 'false');
         wrapper.classList.remove('menu-open');
+        if (restoreFocus) {
+            btn.focus();
+        }
     }
 
     function openTrainMenu() {
@@ -231,7 +234,7 @@
 
     document.addEventListener('keydown', (event) => {
         if (event.key === 'Escape') {
-            closeTrainMenu();
+            closeTrainMenu(true);
         }
     });
 
