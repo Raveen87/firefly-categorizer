@@ -11,7 +11,7 @@
             </svg>
             Start Training
         </button>
-        <button id="train-menu-btn" type="button" onclick="toggleTrainMenu()"
+        <button id="train-menu-btn" type="button" onclick="toggleTrainMenu()" aria-haspopup="menu"
             aria-expanded="false" aria-controls="train-menu"
             class="training-action training-action-primary training-split-toggle px-3 py-3 font-medium border-l"
             aria-label="Open training actions menu"
@@ -23,9 +23,9 @@
                     clip-rule="evenodd" />
             </svg>
         </button>
-        <div id="train-menu" class="training-menu hidden" aria-labelledby="train-menu-btn">
+        <div id="train-menu" class="training-menu hidden" role="menu" aria-labelledby="train-menu-btn">
             <button type="button" onclick="startTraining(true)"
-                class="training-menu-item">
+                class="training-menu-item" role="menuitem" tabindex="-1">
                 Start fresh import
             </button>
         </div>
