@@ -59,7 +59,12 @@ async def categorize_stream(
         raw_txs = result.get("data", [])
 
         category_list = await fetch_category_names(firefly, sort=True)
-        auto_approve_threshold = settings.get_env_float("AUTO_APPROVE_THRESHOLD", 0.0)
+        auto_approve_threshold = settings.get_env_float(
+            "AUTO_APPROVE_THRESHOLD",
+            0.0,
+            min_value=0.0,
+            max_value=1.0,
+        )
 
         for idx, t_data in enumerate(raw_txs):
             if idx % settings.STREAM_YIELD_EVERY == 0:
@@ -130,7 +135,12 @@ async def get_transactions(
         if not predict:
             transactions_display = await asyncio.to_thread(build_transactions_display, raw_txs)
         else:
-            auto_approve_threshold = settings.get_env_float("AUTO_APPROVE_THRESHOLD", 0.0)
+            auto_approve_threshold = settings.get_env_float(
+                "AUTO_APPROVE_THRESHOLD",
+                0.0,
+                min_value=0.0,
+                max_value=1.0,
+            )
             for idx, t_data in enumerate(raw_txs):
                 if idx % settings.STREAM_YIELD_EVERY == 0:
                     await asyncio.sleep(0)

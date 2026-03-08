@@ -5,6 +5,7 @@ from firefly_categorizer.classifiers.base import Classifier
 from firefly_categorizer.classifiers.llm import LLMClassifier
 from firefly_categorizer.classifiers.memory import MemoryMatcher
 from firefly_categorizer.classifiers.tfidf import TfidfClassifier
+from firefly_categorizer.core import settings
 from firefly_categorizer.logger import get_logger
 from firefly_categorizer.models import CategorizationResult, Category, Transaction
 
@@ -34,10 +35,10 @@ class CategorizerService:
 
         # 3. LLM Classifier (Fallback)
         # Only add if API key is present
-        api_key = os.getenv("OPENAI_API_KEY")
+        api_key = settings.get_env_text("OPENAI_API_KEY")
         if api_key:
-            model = os.getenv("OPENAI_MODEL", "gpt-3.5-turbo")
-            base_url = os.getenv("OPENAI_BASE_URL")
+            model = settings.get_env_text("OPENAI_MODEL", "gpt-3.5-turbo") or "gpt-3.5-turbo"
+            base_url = settings.get_env_url("OPENAI_BASE_URL")
             self.llm = LLMClassifier(api_key=api_key, model=model, base_url=base_url)
             self.classifiers.append(self.llm)
             logger.info(f"LLM Classifier enabled: model={model}, base_url={base_url or 'default'}")
@@ -52,10 +53,10 @@ class CategorizerService:
             if not isinstance(classifier, LLMClassifier)
         ]
 
-        api_key = os.getenv("OPENAI_API_KEY")
+        api_key = settings.get_env_text("OPENAI_API_KEY")
         if api_key:
-            model = os.getenv("OPENAI_MODEL", "gpt-3.5-turbo")
-            base_url = os.getenv("OPENAI_BASE_URL")
+            model = settings.get_env_text("OPENAI_MODEL", "gpt-3.5-turbo") or "gpt-3.5-turbo"
+            base_url = settings.get_env_url("OPENAI_BASE_URL")
             self.llm = LLMClassifier(api_key=api_key, model=model, base_url=base_url)
             self.classifiers.append(self.llm)
             logger.info(

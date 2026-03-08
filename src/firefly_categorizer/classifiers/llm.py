@@ -1,7 +1,6 @@
-import os
-
 from openai import OpenAI
 
+from firefly_categorizer.core import settings
 from firefly_categorizer.logger import get_logger
 from firefly_categorizer.models import CategorizationResult, Category, Transaction
 
@@ -12,8 +11,8 @@ logger = get_logger(__name__)
 class LLMClassifier(Classifier):
     def __init__(self, api_key: str | None = None, model: str = "gpt-3.5-turbo", base_url: str | None = None):
         self.client = OpenAI(
-            api_key=api_key or os.getenv("OPENAI_API_KEY"),
-            base_url=base_url or os.getenv("OPENAI_BASE_URL") or None
+            api_key=api_key or settings.get_env_text("OPENAI_API_KEY"),
+            base_url=base_url or settings.get_env_url("OPENAI_BASE_URL") or None
         )
         self.model = model
 

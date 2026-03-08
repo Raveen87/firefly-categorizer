@@ -1,4 +1,6 @@
 import os
+import re
+from urllib.parse import urlparse
 
 from dotenv import find_dotenv, load_dotenv
 
@@ -203,15 +205,54 @@ def get_env_int(name: str, default: int, min_value: int | None = None) -> int:
     return value
 
 
-def get_env_float(name: str, default: float = 0.0) -> float:
+def get_env_float(
+    name: str,
+    default: float = 0.0,
+    min_value: float | None = None,
+    max_value: float | None = None,
+) -> float:
     raw = os.getenv(name)
-    if raw is None:
+    if raw is None or not raw.strip():
         return default
-    return float(raw)
+    try:
+        value = float(raw)
+    except ValueError:
+        logger.warning("[ENV] Invalid %s='%s', coerced to %s.", name, raw, default)
+        return default
+    if min_value is not None and value < min_value:
+        logger.warning(
+            "[ENV] %s='%s' below minimum %s, coerced to %s.",
+            name,
+            raw,
+            min_value,
+            min_value,
+        )
+        value = min_value
+    if max_value is not None and value > max_value:
+        logger.warning(
+            "[ENV] %s='%s' above maximum %s, coerced to %s.",
+            name,
+            raw,
+            max_value,
+            max_value,
+        )
+        value = max_value
+    return value
 
 
 def get_env_tags(name: str) -> list[str]:
-    return parse_tag_list(os.getenv(name))
+    raw = os.getenv(name)
+    if raw is None:
+        return []
+    normalized = _normalize_tag_value(raw)
+    if normalized != raw:
+        logger.warning(
+            "[ENV] Invalid %s='%s', coerced to '%s'.",
+            name,
+            _mask_env_value(name, raw),
+            _mask_env_value(name, normalized),
+        )
+    return parse_tag_list(normalized)
 
 
 _SENSITIVE_ENV_KEYS = (
@@ -265,6 +306,133 @@ def _mask_env_value(name: str, value: str) -> str:
     return f"{sanitized[:2]}...{sanitized[-2:]}"
 
 
+def _log_env_coercion(name: str, raw: str, coerced: str | None, reason: str) -> None:
+    raw_safe = _mask_env_value(name, raw)
+    if coerced is None:
+        coerced_safe = "<unset>"
+    else:
+        coerced_safe = _mask_env_value(name, coerced)
+    logger.warning(
+        "[ENV] %s='%s' %s, coerced to '%s'.",
+        name,
+        raw_safe,
+        reason,
+        coerced_safe,
+    )
+
+
+def _normalize_log_level(raw_value: str, default: str = "INFO") -> str:
+    aliases = {
+        "WARN": "WARNING",
+        "FATAL": "CRITICAL",
+        "ERR": "ERROR",
+    }
+    normalized = raw_value.strip().upper()
+    normalized = aliases.get(normalized, normalized)
+    allowed = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
+    if normalized in allowed:
+        return normalized
+    return default
+
+
+def get_env_log_level(name: str = "LOG_LEVEL", default: str = "INFO") -> str:
+    raw = os.getenv(name)
+    if raw is None or not raw.strip():
+        return default
+    normalized = _normalize_log_level(raw, default=default)
+    if normalized != raw:
+        _log_env_coercion(name, raw, normalized, "is not a valid logging level")
+    return normalized
+
+
+def _normalize_tag_value(raw_value: str) -> str:
+    candidate = re.sub(r"[;|]+", ",", raw_value)
+    tags = parse_tag_list(candidate)
+    return ",".join(tags)
+
+
+def _is_valid_url(value: str) -> bool:
+    parsed = urlparse(value)
+    return bool(parsed.scheme and parsed.netloc)
+
+
+def _normalize_url_value(raw_value: str) -> str | None:
+    normalized = raw_value.strip()
+    if not normalized:
+        return None
+    if "://" not in normalized and not normalized.startswith("/"):
+        normalized = f"http://{normalized}"
+    normalized = normalized.rstrip("/")
+    if not _is_valid_url(normalized):
+        return None
+    return normalized
+
+
+def get_env_url(name: str, default: str | None = None) -> str | None:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    normalized = _normalize_url_value(raw)
+    if normalized is None:
+        _log_env_coercion(name, raw, default, "is not a valid URL")
+        return default
+    if normalized != raw:
+        _log_env_coercion(name, raw, normalized, "is not normalized")
+    return normalized
+
+
+def get_env_path(name: str, default: str | None = None) -> str | None:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    normalized = raw.strip()
+    if not normalized:
+        _log_env_coercion(name, raw, default, "is empty")
+        return default
+    return normalized
+
+
+def get_env_text(name: str, default: str | None = None) -> str | None:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    normalized = raw.strip()
+    if not normalized:
+        if default is not None:
+            _log_env_coercion(name, raw, default, "is empty")
+        return default
+    if normalized != raw:
+        _log_env_coercion(name, raw, normalized, "contains leading or trailing whitespace")
+    return normalized
+
+
+def coerce_runtime_environment() -> None:
+    for key in _CONFIG_KEYS:
+        raw = os.getenv(key)
+        if raw is None:
+            continue
+        coerced: str | None = raw
+        if key == "LOG_LEVEL":
+            coerced = get_env_log_level(name=key, default="INFO")
+        elif key in {"FIREFLY_URL", "OPENAI_BASE_URL"}:
+            coerced = get_env_url(key)
+        elif key in {"MANUAL_TAGS", "AUTO_APPROVE_TAGS"}:
+            coerced = _normalize_tag_value(raw)
+            if coerced != raw:
+                _log_env_coercion(key, raw, coerced, "contains malformed separators or duplicate tags")
+        elif key == "DATA_DIR":
+            coerced = get_env_path(key, default=".")
+        elif key == "LOG_DIR":
+            coerced = get_env_path(key, default=None)
+        elif key in {"FIREFLY_TOKEN", "OPENAI_API_KEY", "OPENAI_MODEL"}:
+            coerced = get_env_text(key)
+
+        if coerced is None:
+            os.environ.pop(key, None)
+            continue
+        os.environ[key] = coerced
+
+
 def log_environment() -> None:
     logger.info("[ENV] Logging configured environment variables (masked where needed).")
     for key in _ENV_KEYS_TO_LOG:
@@ -286,9 +454,10 @@ STREAM_YIELD_EVERY = 50
 
 
 load_environment()
+coerce_runtime_environment()
 
-DATA_DIR = os.getenv("DATA_DIR", ".")
-LOG_DIR = os.getenv("LOG_DIR")
+DATA_DIR = get_env_path("DATA_DIR", ".") or "."
+LOG_DIR = get_env_path("LOG_DIR")
 CONFIG_DIR = os.getenv("CONFIG_DIR")
 
 ensure_dirs(DATA_DIR, LOG_DIR, CONFIG_DIR)

@@ -39,8 +39,10 @@ class ColourizedFormatter(logging.Formatter):
         return result
 
 def get_logging_config() -> dict:
-    log_level_name = os.getenv("LOG_LEVEL", "INFO").upper()
-    log_dir = os.getenv("LOG_DIR")
+    from firefly_categorizer.core import settings
+
+    log_level_name = settings.get_env_log_level()
+    log_dir = settings.get_env_path("LOG_DIR")
     handlers = {
         "console": {
             "class": "logging.StreamHandler",

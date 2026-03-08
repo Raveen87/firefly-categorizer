@@ -410,6 +410,7 @@ def _apply_runtime_overrides(updates: dict[str, str]) -> None:
             os.environ[key] = value
         else:
             os.environ.pop(key, None)
+    settings.coerce_runtime_environment()
 
 
 def apply_runtime_updates(app: Any, updates: dict[str, str]) -> None:
