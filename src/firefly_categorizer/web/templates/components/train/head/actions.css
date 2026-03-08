@@ -34,7 +34,6 @@
             display: inline-flex;
             align-items: stretch;
             border-radius: 0.5rem;
-            isolation: isolate;
         }
 
         .training-split-main {
