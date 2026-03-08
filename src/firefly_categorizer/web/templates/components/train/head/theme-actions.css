@@ -32,20 +32,21 @@
         }
 
         .training-menu {
-            border: none;
-            box-shadow: none;
-            background: transparent;
-            padding: 6px;
+            border-color: color-mix(in srgb, var(--line) 85%, #ffffff 15%);
+            box-shadow: var(--shadow-soft);
+            background: color-mix(in srgb, var(--panel-strong) 94%, #ffffff 6%);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
         }
 
         .training-menu-item {
-            width: 100%;
-            text-align: left;
-            border-radius: 14px;
+            background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+            color: #ffffff;
         }
 
-        .training-menu-item:hover {
-            filter: brightness(1.05);
+        .training-menu-item:hover,
+        .training-menu-item:focus-visible {
+            filter: brightness(1.06);
         }
 
         .training-warning {

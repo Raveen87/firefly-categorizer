@@ -23,6 +23,10 @@
             color: inherit;
         }
 
+        :root[data-theme="dark"] .training-menu-item {
+            color: #0b1120;
+        }
+
         :root[data-theme="dark"] #train-menu-btn.training-action-primary {
             border-left-color: rgba(2, 6, 23, 0.45);
         }
