@@ -234,7 +234,15 @@
 
     document.addEventListener('keydown', (event) => {
         if (event.key === 'Escape') {
-            closeTrainMenu(true);
+            const wrapper = document.getElementById('train-menu-wrapper');
+            const menu = document.getElementById('train-menu');
+            if (!wrapper || !menu) {
+                return;
+            }
+            const isMenuOpen = wrapper.classList.contains('menu-open') || !menu.classList.contains('hidden');
+            if (isMenuOpen) {
+                closeTrainMenu(true);
+            }
         }
     });
 
