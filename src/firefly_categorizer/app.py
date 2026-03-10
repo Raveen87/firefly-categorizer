@@ -18,6 +18,7 @@ logger = get_logger(__name__)
 
 def create_app() -> FastAPI:
     setup_logging()
+    settings.coerce_runtime_environment()
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
