@@ -1,6 +1,7 @@
 import os
 import re
 from math import isfinite
+from typing import overload
 from urllib.parse import urlparse
 
 from dotenv import find_dotenv, load_dotenv
@@ -372,6 +373,15 @@ def _normalize_url_value(raw_value: str) -> str | None:
     return normalized
 
 
+def _normalize_path_value(raw_value: str | None, default: str | None = None) -> str | None:
+    if raw_value is None:
+        return default
+    normalized = raw_value.strip()
+    if not normalized:
+        return default
+    return normalized
+
+
 def get_env_url(name: str, default: str | None = None) -> str | None:
     raw = os.getenv(name)
     if raw is None:
@@ -389,11 +399,19 @@ def get_env_path(name: str, default: str | None = None) -> str | None:
     raw = os.getenv(name)
     if raw is None:
         return default
-    normalized = raw.strip()
+    normalized = _normalize_path_value(raw, default=None)
     if not normalized:
         _log_env_coercion(name, raw, default, "is empty")
         return default
     return normalized
+
+
+@overload
+def get_env_text(name: str, default: None = None) -> str | None: ...
+
+
+@overload
+def get_env_text(name: str, default: str) -> str: ...
 
 
 def get_env_text(name: str, default: str | None = None) -> str | None:
@@ -491,10 +509,9 @@ STREAM_YIELD_EVERY = 50
 
 
 load_environment()
-coerce_runtime_environment()
 
-DATA_DIR = get_env_path("DATA_DIR", ".") or "."
-LOG_DIR = get_env_path("LOG_DIR")
+DATA_DIR = _normalize_path_value(os.getenv("DATA_DIR"), ".") or "."
+LOG_DIR = _normalize_path_value(os.getenv("LOG_DIR"))
 CONFIG_DIR = os.getenv("CONFIG_DIR")
 
 ensure_dirs(DATA_DIR, LOG_DIR, CONFIG_DIR)

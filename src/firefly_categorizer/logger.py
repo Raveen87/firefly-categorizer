@@ -38,11 +38,34 @@ class ColourizedFormatter(logging.Formatter):
         record.levelname = orig_levelname
         return result
 
-def get_logging_config() -> dict:
-    from firefly_categorizer.core import settings
 
-    log_level_name = settings.get_env_log_level()
-    log_dir = settings.get_env_path("LOG_DIR")
+def _normalize_log_level(raw_value: str | None, default: str = "INFO") -> str:
+    if raw_value is None:
+        return default
+    aliases = {
+        "WARN": "WARNING",
+        "FATAL": "CRITICAL",
+        "ERR": "ERROR",
+    }
+    normalized = raw_value.strip().upper()
+    normalized = aliases.get(normalized, normalized)
+    allowed = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
+    if normalized in allowed:
+        return normalized
+    return default
+
+
+def _normalize_path(raw_value: str | None) -> str | None:
+    if raw_value is None:
+        return None
+    normalized = raw_value.strip()
+    if not normalized:
+        return None
+    return normalized
+
+def get_logging_config() -> dict:
+    log_level_name = _normalize_log_level(os.getenv("LOG_LEVEL"))
+    log_dir = _normalize_path(os.getenv("LOG_DIR"))
     handlers = {
         "console": {
             "class": "logging.StreamHandler",
