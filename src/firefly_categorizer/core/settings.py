@@ -1,5 +1,6 @@
 import os
 import re
+from math import isfinite
 from urllib.parse import urlparse
 
 from dotenv import find_dotenv, load_dotenv
@@ -217,25 +218,16 @@ def get_env_float(
     try:
         value = float(raw)
     except ValueError:
-        logger.warning("[ENV] Invalid %s='%s', coerced to %s.", name, raw, default)
+        _log_env_coercion(name, raw, str(default), "is not a valid number")
+        return default
+    if not isfinite(value):
+        _log_env_coercion(name, raw, str(default), "is not a finite number")
         return default
     if min_value is not None and value < min_value:
-        logger.warning(
-            "[ENV] %s='%s' below minimum %s, coerced to %s.",
-            name,
-            raw,
-            min_value,
-            min_value,
-        )
+        _log_env_coercion(name, raw, str(min_value), f"is below minimum {min_value}")
         value = min_value
     if max_value is not None and value > max_value:
-        logger.warning(
-            "[ENV] %s='%s' above maximum %s, coerced to %s.",
-            name,
-            raw,
-            max_value,
-            max_value,
-        )
+        _log_env_coercion(name, raw, str(max_value), f"is above maximum {max_value}")
         value = max_value
     return value
 
@@ -339,9 +331,21 @@ def get_env_log_level(name: str = "LOG_LEVEL", default: str = "INFO") -> str:
     raw = os.getenv(name)
     if raw is None or not raw.strip():
         return default
+    raw_normalized = raw.strip().upper()
+    aliases = {
+        "WARN": "WARNING",
+        "FATAL": "CRITICAL",
+        "ERR": "ERROR",
+    }
+    allowed = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
     normalized = _normalize_log_level(raw, default=default)
     if normalized != raw:
-        _log_env_coercion(name, raw, normalized, "is not a valid logging level")
+        if raw_normalized in aliases:
+            _log_env_coercion(name, raw, normalized, "uses an alias")
+        elif raw_normalized in allowed:
+            _log_env_coercion(name, raw, normalized, "is not normalized")
+        else:
+            _log_env_coercion(name, raw, normalized, "is not a valid logging level")
     return normalized
 
 
@@ -414,6 +418,39 @@ def coerce_runtime_environment() -> None:
         coerced: str | None = raw
         if key == "LOG_LEVEL":
             coerced = get_env_log_level(name=key, default="INFO")
+        elif key == "FIREFLY_HTTP_TIMEOUT":
+            coerced = str(
+                get_env_float(
+                    key,
+                    60.0,
+                    min_value=0.0,
+                )
+            )
+        elif key == "FIREFLY_CATEGORIES_TTL":
+            coerced = str(
+                get_env_float(
+                    key,
+                    60.0,
+                    min_value=0.0,
+                )
+            )
+        elif key == "AUTO_APPROVE_THRESHOLD":
+            coerced = str(
+                get_env_float(
+                    key,
+                    0.0,
+                    min_value=0.0,
+                    max_value=1.0,
+                )
+            )
+        elif key == "TRAINING_PAGE_SIZE":
+            coerced = str(
+                get_env_int(
+                    key,
+                    DEFAULT_TRAINING_PAGE_SIZE,
+                    min_value=1,
+                )
+            )
         elif key in {"FIREFLY_URL", "OPENAI_BASE_URL"}:
             coerced = get_env_url(key)
         elif key in {"MANUAL_TAGS", "AUTO_APPROVE_TAGS"}:

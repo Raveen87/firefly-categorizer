@@ -12,7 +12,7 @@ class LLMClassifier(Classifier):
     def __init__(self, api_key: str | None = None, model: str = "gpt-3.5-turbo", base_url: str | None = None):
         self.client = OpenAI(
             api_key=api_key or settings.get_env_text("OPENAI_API_KEY"),
-            base_url=base_url or settings.get_env_url("OPENAI_BASE_URL") or None
+            base_url=base_url or settings.get_env_url("OPENAI_BASE_URL")
         )
         self.model = model
 

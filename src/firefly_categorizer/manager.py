@@ -1,5 +1,6 @@
 import os
 import time
+from typing import cast
 
 from firefly_categorizer.classifiers.base import Classifier
 from firefly_categorizer.classifiers.llm import LLMClassifier
@@ -37,7 +38,7 @@ class CategorizerService:
         # Only add if API key is present
         api_key = settings.get_env_text("OPENAI_API_KEY")
         if api_key:
-            model = settings.get_env_text("OPENAI_MODEL", "gpt-3.5-turbo") or "gpt-3.5-turbo"
+            model = cast(str, settings.get_env_text("OPENAI_MODEL", "gpt-3.5-turbo"))
             base_url = settings.get_env_url("OPENAI_BASE_URL")
             self.llm = LLMClassifier(api_key=api_key, model=model, base_url=base_url)
             self.classifiers.append(self.llm)
@@ -55,7 +56,7 @@ class CategorizerService:
 
         api_key = settings.get_env_text("OPENAI_API_KEY")
         if api_key:
-            model = settings.get_env_text("OPENAI_MODEL", "gpt-3.5-turbo") or "gpt-3.5-turbo"
+            model = cast(str, settings.get_env_text("OPENAI_MODEL", "gpt-3.5-turbo"))
             base_url = settings.get_env_url("OPENAI_BASE_URL")
             self.llm = LLMClassifier(api_key=api_key, model=model, base_url=base_url)
             self.classifiers.append(self.llm)
