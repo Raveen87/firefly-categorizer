@@ -6,6 +6,11 @@ from urllib.parse import urlparse
 
 from dotenv import find_dotenv, load_dotenv
 
+from firefly_categorizer.core.log_levels import (
+    ALLOWED_LOG_LEVELS,
+    LOG_LEVEL_ALIASES,
+    normalize_log_level,
+)
 from firefly_categorizer.domain.tags import parse_tag_list
 from firefly_categorizer.logger import get_logger
 
@@ -315,17 +320,7 @@ def _log_env_coercion(name: str, raw: str, coerced: str | None, reason: str) -> 
 
 
 def _normalize_log_level(raw_value: str, default: str = "INFO") -> str:
-    aliases = {
-        "WARN": "WARNING",
-        "FATAL": "CRITICAL",
-        "ERR": "ERROR",
-    }
-    normalized = raw_value.strip().upper()
-    normalized = aliases.get(normalized, normalized)
-    allowed = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
-    if normalized in allowed:
-        return normalized
-    return default
+    return normalize_log_level(raw_value, default=default)
 
 
 def get_env_log_level(name: str = "LOG_LEVEL", default: str = "INFO") -> str:
@@ -333,17 +328,11 @@ def get_env_log_level(name: str = "LOG_LEVEL", default: str = "INFO") -> str:
     if raw is None or not raw.strip():
         return default
     raw_normalized = raw.strip().upper()
-    aliases = {
-        "WARN": "WARNING",
-        "FATAL": "CRITICAL",
-        "ERR": "ERROR",
-    }
-    allowed = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
     normalized = _normalize_log_level(raw, default=default)
     if normalized != raw:
-        if raw_normalized in aliases:
+        if raw_normalized in LOG_LEVEL_ALIASES:
             _log_env_coercion(name, raw, normalized, "uses an alias")
-        elif raw_normalized in allowed:
+        elif raw_normalized in ALLOWED_LOG_LEVELS:
             _log_env_coercion(name, raw, normalized, "is not normalized")
         else:
             _log_env_coercion(name, raw, normalized, "is not a valid logging level")

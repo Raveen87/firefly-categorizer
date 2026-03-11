@@ -2,6 +2,8 @@ import logging
 import logging.config
 import os
 
+from firefly_categorizer.core.log_levels import normalize_log_level
+
 
 class ColourizedFormatter(logging.Formatter):
     """
@@ -40,19 +42,7 @@ class ColourizedFormatter(logging.Formatter):
 
 
 def _normalize_log_level(raw_value: str | None, default: str = "INFO") -> str:
-    if raw_value is None:
-        return default
-    aliases = {
-        "WARN": "WARNING",
-        "FATAL": "CRITICAL",
-        "ERR": "ERROR",
-    }
-    normalized = raw_value.strip().upper()
-    normalized = aliases.get(normalized, normalized)
-    allowed = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
-    if normalized in allowed:
-        return normalized
-    return default
+    return normalize_log_level(raw_value, default=default)
 
 
 def _normalize_path(raw_value: str | None) -> str | None:
