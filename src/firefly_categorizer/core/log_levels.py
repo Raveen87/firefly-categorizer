@@ -1,3 +1,4 @@
+from collections.abc import Mapping
 from types import MappingProxyType
 from typing import Final
 
@@ -7,7 +8,7 @@ _LOG_LEVEL_ALIASES: dict[str, str] = {
     "ERR": "ERROR",
 }
 
-LOG_LEVEL_ALIASES: Final[MappingProxyType[str, str]] = MappingProxyType(_LOG_LEVEL_ALIASES)
+LOG_LEVEL_ALIASES: Final[Mapping[str, str]] = MappingProxyType(_LOG_LEVEL_ALIASES)
 
 ALLOWED_LOG_LEVELS: Final[frozenset[str]] = frozenset(
     {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
