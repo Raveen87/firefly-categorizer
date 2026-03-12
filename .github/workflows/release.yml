@@ -113,7 +113,7 @@ jobs:
           docker run --rm \
             -v "${{ github.workspace }}:/work:ro" \
             -v "${{ github.workspace }}/CHANGELOG.md:/work/CHANGELOG.md" \
-            -w /work ghcr.io/orhun/git-cliff:latest \
+            -w /work orhunp/git-cliff:latest \
             --config cliff.toml --tag "v${{ inputs.version }}" --output CHANGELOG.md
           notes=$(awk '
             BEGIN { in_section = 0 }
