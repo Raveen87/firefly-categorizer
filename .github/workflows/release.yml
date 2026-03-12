@@ -87,15 +87,15 @@ jobs:
           version = "${{ inputs.version }}"
           path = pathlib.Path("pyproject.toml")
           text = path.read_text(encoding="utf-8")
-          project_header = re.search(r'(?m)^\\[project\\]\\s*$', text)
+          project_header = re.search(r'(?m)^\[project\]\s*$', text)
           if not project_header:
               raise SystemExit("Unable to find [project] section in pyproject.toml")
           section_start = project_header.end()
-          next_header = re.search(r'(?m)^\\[.*\\]\\s*$', text[section_start:])
+          next_header = re.search(r'(?m)^\[.*\]\s*$', text[section_start:])
           section_end = section_start + (next_header.start() if next_header else len(text[section_start:]))
           project_section = text[section_start:section_end]
           updated_section, count = re.subn(
-              r'(?m)^version = "([^"]+)"\\s*$',
+              r'(?m)^version = "([^"]+)"\s*$',
               f'version = "{version}"',
               project_section,
               count=1,
