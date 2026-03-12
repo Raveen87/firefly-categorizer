@@ -124,10 +124,11 @@ jobs:
             }
             { if (in_section) print }
           ' CHANGELOG.md)
+          delimiter="CHANGELOG_NOTES_$(date +%s%N)"
           {
-            echo "notes<<'EOF'"
-            echo "$notes"
-            echo "EOF"
+            echo "notes<<$delimiter"
+            printf '%s\n' "$notes"
+            echo "$delimiter"
           } >> "$GITHUB_OUTPUT"
 
       - name: Log in to Docker Hub
