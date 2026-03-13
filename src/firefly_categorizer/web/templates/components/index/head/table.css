@@ -26,7 +26,8 @@
 
     .transactions-table {
         width: 100%;
-        border-collapse: collapse;
+        border-collapse: separate;
+        border-spacing: 0;
     }
 
     .transactions-table thead th {
@@ -42,8 +43,16 @@
 
     .transactions-table tbody td {
         padding: 12px;
-        border-bottom: 1px solid var(--line);
+        border-bottom: 0;
         font-size: 0.95rem;
+    }
+
+    .transactions-table tbody tr {
+        box-shadow: inset 0 -1px 0 var(--line);
+    }
+
+    .transactions-table tbody tr:last-child {
+        box-shadow: none;
     }
 
     .table-row {
