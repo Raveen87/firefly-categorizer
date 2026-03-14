@@ -1,6 +1,162 @@
+function shouldDisplayTransaction(transaction, showCategorized) {
+    return showCategorized || !transaction.existing_category;
+}
+
+function buildTransactionRow(transaction) {
+    const isCategorized = transaction.existing_category ? true : false;
+    const isProcessed = transaction.processed ? true : isCategorized;
+    const transactionId = String(transaction.id);
+    const row = document.createElement('tr');
+    row.dataset.transactionId = transactionId;
+    row.className = `table-row${isCategorized ? ' is-categorized' : ''}${isProcessed ? ' is-processed' : ''}`;
+
+    let predictionName = 'Unknown';
+    let confidence = '-';
+    let predictedCat = null;
+
+    if (transaction.prediction) {
+        predictionName = transaction.prediction.category.name;
+        predictedCat = transaction.prediction.category.name;
+        confidence = transaction.prediction.confidence.toFixed(2);
+    }
+
+    const buttonClass = isCategorized ? 'btn btn-disabled btn-xs' : 'btn btn-primary btn-xs';
+    const dateCell = document.createElement('td');
+    if (isProcessed) {
+        const indicator = document.createElement('span');
+        indicator.className = 'processed-indicator tooltip';
+        indicator.setAttribute('data-tooltip', 'Already processed');
+        indicator.setAttribute('aria-label', 'Already processed');
+        indicator.setAttribute('role', 'img');
+        indicator.textContent = '✓';
+        dateCell.appendChild(indicator);
+    }
+    const dateSpan = document.createElement('span');
+    dateSpan.textContent = transaction.date_formatted ?? '';
+    dateCell.appendChild(dateSpan);
+
+    const descriptionCell = document.createElement('td');
+    descriptionCell.textContent = transaction.description ?? '';
+
+    const amountCell = document.createElement('td');
+    amountCell.textContent = `${transaction.amount ?? ''} ${transaction.currency ?? ''}`.trim();
+
+    const categoryCell = document.createElement('td');
+    if (isCategorized) {
+        const categorySpan = document.createElement('span');
+        categorySpan.className = 'font-semibold';
+        categorySpan.textContent = transaction.existing_category ?? '';
+        const statusTag = document.createElement('span');
+        statusTag.className = transaction.auto_approved ? 'tag' : 'tag tag-muted';
+        statusTag.textContent = transaction.auto_approved ? 'Auto' : 'Existing';
+        categoryCell.append(categorySpan, document.createTextNode(' '), statusTag);
+    } else if (predictedCat) {
+        const sourceLabels = {
+            'memory_exact': 'M',
+            'memory_fuzzy': 'M~',
+            'tfidf': 'ML',
+            'llm': 'AI'
+        };
+        const predictionSpan = document.createElement('span');
+        predictionSpan.className = 'prediction';
+        predictionSpan.textContent = predictionName;
+        const sourceTag = document.createElement('span');
+        sourceTag.className = 'tag tag-muted';
+        sourceTag.title = transaction.prediction.source;
+        sourceTag.textContent = sourceLabels[transaction.prediction.source] || transaction.prediction.source;
+        categoryCell.append(predictionSpan, document.createTextNode(' '), sourceTag);
+    } else {
+        const unknownSpan = document.createElement('span');
+        unknownSpan.className = 'text-muted';
+        unknownSpan.textContent = 'Unknown';
+        categoryCell.appendChild(unknownSpan);
+    }
+
+    const confidenceCell = document.createElement('td');
+    confidenceCell.textContent = isCategorized ? '-' : confidence;
+
+    const actionsCell = document.createElement('td');
+    actionsCell.className = 'flex items-center gap-2';
+
+    const select = document.createElement('select');
+    select.id = `cat-${transactionId}`;
+    select.className = 'select-input';
+    select.disabled = isCategorized;
+
+    const placeholderOption = document.createElement('option');
+    placeholderOption.value = '';
+    placeholderOption.disabled = true;
+    placeholderOption.selected = !predictedCat;
+    placeholderOption.textContent = 'Select Category';
+    select.appendChild(placeholderOption);
+
+    CATEGORIES.forEach(cat => {
+        const option = document.createElement('option');
+        option.value = cat;
+        option.selected = cat === predictedCat;
+        option.textContent = cat;
+        select.appendChild(option);
+    });
+
+    const saveButton = document.createElement('button');
+    saveButton.id = `btn-${transactionId}`;
+    saveButton.className = buttonClass;
+    saveButton.disabled = isCategorized;
+    saveButton.textContent = 'Save';
+    saveButton.addEventListener('click', () => saveTransaction(transactionId, predictedCat || ''));
+
+    const rawInput = document.createElement('input');
+    rawInput.type = 'hidden';
+    rawInput.id = `raw-${transactionId}`;
+    rawInput.value = transaction.raw_obj ?? '';
+
+    actionsCell.append(select, saveButton, rawInput);
+    row.append(dateCell, descriptionCell, amountCell, categoryCell, confidenceCell, actionsCell);
+    return row;
+}
+
+function updateDisplayedCountMeta() {
+    updateTableMeta(dom.tbody.children.length);
+}
+
+function escapeCssAttributeValue(value) {
+    if (typeof CSS !== 'undefined' && typeof CSS.escape === 'function') {
+        return CSS.escape(value);
+    }
+    return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\]/g, '\\]');
+}
+
+function updateTransactionRow(transactionId) {
+    const normalizedTransactionId = String(transactionId);
+    const transaction = state.transactions.find(t => String(t.id) === normalizedTransactionId);
+    if (!transaction) {
+        return;
+    }
+
+    const escapedTransactionId = escapeCssAttributeValue(normalizedTransactionId);
+    const existingRow = dom.tbody.querySelector(`tr[data-transaction-id="${escapedTransactionId}"]`);
+    const showCategorized = dom.showCategorized.checked;
+
+    if (!shouldDisplayTransaction(transaction, showCategorized)) {
+        if (existingRow) {
+            existingRow.remove();
+            updateDisplayedCountMeta();
+        }
+        return;
+    }
+
+    const newRow = buildTransactionRow(transaction);
+    if (existingRow) {
+        existingRow.replaceWith(newRow);
+        return;
+    }
+
+    // Fallback for out-of-sync DOM state: perform a full render to restore row order.
+    scheduleRender();
+}
+
 function renderTransactions() {
     dom.tbody.innerHTML = '';
-    let displayedCount = 0;
 
     if (!state.transactions || state.transactions.length === 0) {
         dom.noData.textContent = 'No transactions found.';
@@ -21,77 +177,15 @@ function renderTransactions() {
     updatePagePicker();
 
     const showCategorized = dom.showCategorized.checked;
+    const fragment = document.createDocumentFragment();
 
-    state.transactions.forEach(t => {
-        const isCategorized = t.existing_category ? true : false;
-        const isProcessed = t.processed ? true : isCategorized;
-        if (isCategorized && !showCategorized) {
+    state.transactions.forEach(transaction => {
+        if (!shouldDisplayTransaction(transaction, showCategorized)) {
             return;
         }
-
-        const row = document.createElement('tr');
-        row.className = `table-row${isCategorized ? ' is-categorized' : ''}${isProcessed ? ' is-processed' : ''}`;
-
-        let predictionName = 'Unknown';
-        let confidence = '-';
-        let predictedCat = null;
-
-        if (t.prediction) {
-            predictionName = t.prediction.category.name;
-            predictedCat = t.prediction.category.name;
-            confidence = t.prediction.confidence.toFixed(2);
-        }
-
-        let optionsHtml = `<option value="" disabled ${!predictedCat ? 'selected' : ''}>Select Category</option>`;
-        CATEGORIES.forEach(cat => {
-            const isSelected = (cat === predictedCat) ? 'selected' : '';
-            optionsHtml += `<option value="${cat}" ${isSelected}>${cat}</option>`;
-        });
-
-        const selectDisabled = isCategorized ? 'disabled' : '';
-        const buttonDisabled = isCategorized ? 'disabled' : '';
-        const buttonClass = isCategorized ? 'btn btn-disabled btn-xs' : 'btn btn-primary btn-xs';
-
-        let categoryDisplay = '';
-        if (isCategorized) {
-            const autoLabel = t.auto_approved ? '<span class="tag">Auto</span>' : '<span class="tag tag-muted">Existing</span>';
-            categoryDisplay = `<span class="font-semibold">${t.existing_category}</span> ${autoLabel}`;
-        } else if (predictedCat) {
-            const sourceLabels = {
-                'memory_exact': 'M',
-                'memory_fuzzy': 'M~',
-                'tfidf': 'ML',
-                'llm': 'AI'
-            };
-            const sourceLabel = sourceLabels[t.prediction.source] || t.prediction.source;
-            categoryDisplay = `<span class="prediction">${predictionName}</span> <span class="tag tag-muted" title="${t.prediction.source}">${sourceLabel}</span>`;
-        } else {
-            categoryDisplay = `<span class="text-muted">Unknown</span>`;
-        }
-
-        const processedIndicator = isProcessed
-            ? '<span class="processed-indicator tooltip" data-tooltip="Already processed" aria-label="Already processed" role="img">✓</span>'
-            : '';
-        const dateMarkup = `<span>${t.date_formatted}</span>`;
-
-        row.innerHTML = `
-                    <td>${processedIndicator}${dateMarkup}</td>
-                    <td>${t.description}</td>
-                    <td>${t.amount} ${t.currency}</td>
-                    <td>${categoryDisplay}</td>
-                    <td>${isCategorized ? '-' : confidence}</td>
-                    <td class="flex items-center gap-2">
-                        <select id="cat-${t.id}" class="select-input" ${selectDisabled}>
-                            ${optionsHtml}
-                        </select>
-                        <button id="btn-${t.id}" onclick="saveTransaction('${t.id}', '${predictedCat || ''}')"
-                            class="${buttonClass}" ${buttonDisabled}>Save</button>
-                        <input type="hidden" id="raw-${t.id}" value='${t.raw_obj}'>
-                    </td>
-                `;
-        dom.tbody.appendChild(row);
-        displayedCount += 1;
+        fragment.appendChild(buildTransactionRow(transaction));
     });
 
-    updateTableMeta(displayedCount);
+    dom.tbody.appendChild(fragment);
+    updateDisplayedCountMeta();
 }

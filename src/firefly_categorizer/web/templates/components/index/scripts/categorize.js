@@ -58,20 +58,25 @@ function runCategorization() {
             return;
         }
 
-        const idx = state.transactions.findIndex(t => t.id === data.id);
+        const normalizedDataId = String(data.id);
+        const idx = state.transactions.findIndex(t => String(t.id) === normalizedDataId);
         if (idx !== -1) {
-            if (data.prediction) {
+            if ('prediction' in data) {
                 state.transactions[idx].prediction = data.prediction;
             }
-            if (data.existing_category) {
+            if ('existing_category' in data) {
                 state.transactions[idx].existing_category = data.existing_category;
             }
-            if (data.auto_approved) {
+            if ('auto_approved' in data) {
                 state.transactions[idx].auto_approved = data.auto_approved;
             }
             state.transactions[idx].processed = true;
 
-            scheduleRender();
+            if (typeof updateTransactionRow === 'function') {
+                updateTransactionRow(normalizedDataId);
+            } else {
+                scheduleRender();
+            }
         }
     };
 

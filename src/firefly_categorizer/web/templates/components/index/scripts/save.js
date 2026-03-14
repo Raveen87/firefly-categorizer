@@ -2,9 +2,10 @@
             const selectEl = document.getElementById(`cat-${transactionId}`);
             if (!selectEl) return;
 
+            const normalizedTransactionId = String(transactionId);
             const categoryName = selectEl.value;
             const btn = document.getElementById(`btn-${transactionId}`);
-            const transaction = state.transactions.find(t => t.id === transactionId);
+            const transaction = state.transactions.find(t => String(t.id) === normalizedTransactionId);
             const existingTags = transaction && Array.isArray(transaction.existing_tags)
                 ? transaction.existing_tags
                 : [];
@@ -34,7 +35,7 @@
                     body: JSON.stringify({
                         transaction: transactionObj,
                         category: { name: categoryName },
-                        transaction_id: transactionId,
+                        transaction_id: normalizedTransactionId,
                         suggested_category: suggestedCategory || null,
                         existing_tags: existingTags
                     })
