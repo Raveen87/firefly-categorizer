@@ -107,6 +107,9 @@ jobs:
           path.write_text(new_text, encoding="utf-8")
           PY
 
+      - name: Update lockfile
+        run: uv lock
+
       - name: Generate changelog
         id: changelog
         shell: bash
@@ -157,7 +160,7 @@ jobs:
 
       - name: Commit changelog and version
         run: |
-          git add pyproject.toml CHANGELOG.md
+          git add pyproject.toml uv.lock CHANGELOG.md
           git commit -m "chore(release): v${{ inputs.version }}"
 
       - name: Tag release
