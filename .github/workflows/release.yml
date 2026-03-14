@@ -50,9 +50,6 @@ jobs:
           enable-cache: true
           cache-dependency-glob: uv.lock
 
-      - name: Install dependencies
-        run: uv sync --frozen --all-groups
-
       - name: Validate version
         shell: bash
         run: |
@@ -64,15 +61,6 @@ jobs:
             echo "Tag v${{ inputs.version }} already exists" >&2
             exit 1
           fi
-
-      - name: Run tests
-        run: uv run pytest
-
-      - name: Type check
-        run: uv run ty check
-
-      - name: Lint
-        run: uv run ruff check
 
       - name: Configure git
         run: |
@@ -109,6 +97,18 @@ jobs:
 
       - name: Update lockfile
         run: uv lock
+
+      - name: Install dependencies
+        run: uv sync --frozen --all-groups
+
+      - name: Run tests
+        run: uv run pytest
+
+      - name: Type check
+        run: uv run ty check
+
+      - name: Lint
+        run: uv run ruff check
 
       - name: Generate changelog
         id: changelog
