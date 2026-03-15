@@ -173,5 +173,9 @@ jobs:
         with:
           tag_name: v${{ inputs.version }}
           name: v${{ inputs.version }}
-          body: ${{ steps.changelog.outputs.notes }}
+          body: |
+            ${{ steps.changelog.outputs.notes }}
+
+            ## Docker image
+            - `${{ env.IMAGE_NAME }}:${{ inputs.version }}`
           draft: true
