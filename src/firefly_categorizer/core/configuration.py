@@ -165,6 +165,16 @@ CONFIG_FIELDS: tuple[ConfigField, ...] = (
         restart_required=True,
     ),
     ConfigField(
+        key="CONFIG_DIR",
+        yaml_path=("storage", "configDir"),
+        label="Config Directory",
+        description="Directory containing config.yaml and optional .env.",
+        placeholder="/app/config",
+        input_type="text",
+        category="Storage",
+        restart_required=True,
+    ),
+    ConfigField(
         key="LOG_LEVEL",
         yaml_path=("logging", "level"),
         label="Log Level",
@@ -177,7 +187,7 @@ CONFIG_FIELDS: tuple[ConfigField, ...] = (
     ),
 )
 
-DOCKER_UI_LOCKED_KEYS: tuple[str, ...] = ("DATA_DIR", "LOG_DIR", "LOG_LEVEL")
+DOCKER_UI_LOCKED_KEYS: tuple[str, ...] = ("DATA_DIR", "LOG_DIR", "CONFIG_DIR", "LOG_LEVEL")
 
 
 def get_config_keys() -> tuple[str, ...]:
@@ -289,11 +299,7 @@ def build_config_context(
                 else:
                     display_value = "" if field.sensitive else env_value
 
-            placeholder = (
-                "Set via environment variable"
-                if env_override
-                else field.placeholder
-            )
+            placeholder = "Set via environment variable" if env_override else field.placeholder
             section_fields.append(
                 {
                     "key": field.key,
@@ -478,7 +484,7 @@ def _format_yaml_value(value: str) -> str:
     if not needs_quotes:
         return value
     escaped = value.replace("\\", "\\\\").replace('"', '\\"')
-    return f"\"{escaped}\""
+    return f'"{escaped}"'
 
 
 CONFIG_TEMPLATE = "\n".join(_render_config_lines({})) + "\n"

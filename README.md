@@ -29,6 +29,7 @@ Environment variables take precedence and lock the corresponding field in the UI
     * `AUTO_APPROVE_THRESHOLD`: (Optional) Confidence threshold for auto-approval (0-1, 0 disables).
     * `MANUAL_TAGS`: (Optional) Comma-separated tags to apply when you click Save.
     * `AUTO_APPROVE_TAGS`: (Optional) Comma-separated tags to apply when auto-approval kicks in.
+    * `CONFIG_DIR`: (Optional) Directory containing `config.yaml` and `.env`.
 
 ### Option B: config.yaml
 
@@ -45,7 +46,16 @@ Environment variables take precedence and lock the corresponding field in the UI
      autoApproveThreshold: 0.9
      manualTags: firefly-categorizer
      autoApproveTags: firefly-categorizer,auto-approved
+
+   storage:
+     dataDir: ./data
+     logDir: ./logs
+     configDir: ./config
    ```
+
+`storage.configDir` maps to `CONFIG_DIR` for runtime configuration parity. To change where
+the app discovers `config.yaml`/`.env` at startup, set `CONFIG_DIR` as an environment variable
+before launching the app.
 
 ## Running
 

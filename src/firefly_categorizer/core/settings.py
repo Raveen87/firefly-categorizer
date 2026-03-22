@@ -37,6 +37,7 @@ _CONFIG_KEYS = (
     "AUTO_APPROVE_TAGS",
     "DATA_DIR",
     "LOG_DIR",
+    "CONFIG_DIR",
     "LOG_LEVEL",
 )
 
@@ -54,6 +55,7 @@ _CONFIG_KEY_PATHS: dict[str, tuple[str, str]] = {
     "AUTO_APPROVE_TAGS": ("automation", "autoApproveTags"),
     "DATA_DIR": ("storage", "dataDir"),
     "LOG_DIR": ("storage", "logDir"),
+    "CONFIG_DIR": ("storage", "configDir"),
     "LOG_LEVEL": ("logging", "level"),
 }
 _CONFIG_PATH_TO_KEY = {path: key for key, path in _CONFIG_KEY_PATHS.items()}
@@ -279,6 +281,7 @@ _ENV_KEYS_TO_LOG = (
     "AUTO_APPROVE_TAGS",
     "DATA_DIR",
     "LOG_DIR",
+    "CONFIG_DIR",
 )
 
 
@@ -468,6 +471,8 @@ def coerce_runtime_environment() -> None:
             coerced = get_env_path(key, default=".")
         elif key == "LOG_DIR":
             coerced = get_env_path(key, default=None)
+        elif key == "CONFIG_DIR":
+            coerced = get_env_path(key, default=None)
         elif key in {"FIREFLY_TOKEN", "OPENAI_API_KEY", "OPENAI_MODEL"}:
             coerced = get_env_text(key)
 
@@ -501,7 +506,7 @@ load_environment()
 
 DATA_DIR = _normalize_path_value(os.getenv("DATA_DIR"), ".") or "."
 LOG_DIR = _normalize_path_value(os.getenv("LOG_DIR"))
-CONFIG_DIR = os.getenv("CONFIG_DIR")
+CONFIG_DIR = _normalize_path_value(os.getenv("CONFIG_DIR"))
 
 ensure_dirs(DATA_DIR, LOG_DIR, CONFIG_DIR)
 

@@ -24,7 +24,7 @@ def _env_example_keys() -> set[str]:
 def test_build_config_context_includes_docker_locked_storage_fields(
     monkeypatch,
 ) -> None:
-    locked = {"DATA_DIR", "LOG_DIR", "LOG_LEVEL"}
+    locked = {"DATA_DIR", "LOG_DIR", "CONFIG_DIR", "LOG_LEVEL"}
     monkeypatch.setattr(configuration, "get_config_path", lambda: None)
     monkeypatch.setattr(configuration, "_load_config_values", lambda _path: {})
     monkeypatch.setattr(
@@ -35,7 +35,7 @@ def test_build_config_context_includes_docker_locked_storage_fields(
 
     context = configuration.build_config_context()
 
-    assert context["docker_ui_locked_fields"] == ["DATA_DIR", "LOG_DIR", "LOG_LEVEL"]
+    assert context["docker_ui_locked_fields"] == ["DATA_DIR", "LOG_DIR", "CONFIG_DIR", "LOG_LEVEL"]
 
 
 def test_build_config_context_omits_docker_locked_fields_when_unlocked(
@@ -66,6 +66,8 @@ def test_read_config_file_supports_nested_lower_camel_yaml(tmp_path: Path) -> No
                 "automation:",
                 "  autoApproveThreshold: 0.9",
                 "  manualTags: firefly-categorizer,reviewed",
+                "storage:",
+                "  configDir: ./config",
                 "logging:",
                 "  level: DEBUG",
                 "",
@@ -82,6 +84,7 @@ def test_read_config_file_supports_nested_lower_camel_yaml(tmp_path: Path) -> No
         "FIREFLY_HTTP_TIMEOUT": "12.5",
         "AUTO_APPROVE_THRESHOLD": "0.9",
         "MANUAL_TAGS": "firefly-categorizer,reviewed",
+        "CONFIG_DIR": "./config",
         "LOG_LEVEL": "DEBUG",
     }
 
@@ -129,8 +132,7 @@ def test_write_config_file_emits_nested_lower_camel_yaml(
         in rendered
     )
     assert (
-        "  # Seconds before Firefly III API requests time out. Minimum: 0. Step: 0.01.\n"
-        "  httpTimeout: 12.5" in rendered
+        "  # Seconds before Firefly III API requests time out. Minimum: 0. Step: 0.01.\n  httpTimeout: 12.5" in rendered
     )
     assert (
         "openai:\n  # API key used for optional LLM fallback.\n  apiKey:\n\n"
@@ -139,6 +141,11 @@ def test_write_config_file_emits_nested_lower_camel_yaml(
     assert (
         "automation:\n  # Confidence threshold (0-1). 0 disables auto-approve. Allowed range: 0 to 1. Step: 0.01.\n"
         "  autoApproveThreshold: 0.9" in rendered
+    )
+    assert (
+        "storage:\n  # Directory for memory and model artifacts.\n  dataDir:\n\n"
+        "  # Directory for application logs (app.log).\n  logDir:\n\n"
+        "  # Directory containing config.yaml and optional .env.\n  configDir:" in rendered
     )
     assert (
         "logging:\n  # Logging verbosity for the application. Allowed values: DEBUG, INFO, WARNING, ERROR, CRITICAL.\n"

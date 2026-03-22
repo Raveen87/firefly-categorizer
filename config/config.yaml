@@ -42,6 +42,9 @@ storage:
   # Directory for application logs (app.log).
   logDir:
 
+  # Directory containing config.yaml and optional .env.
+  configDir:
+
 logging:
   # Logging verbosity for the application. Allowed values: DEBUG, INFO, WARNING, ERROR, CRITICAL.
   level:
