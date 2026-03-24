@@ -17,6 +17,13 @@ It combines three approaches in a single pipeline:
 - Accepts Firefly III webhooks to categorize new transactions as they are created
 - Persists learned state to disk so the service improves over time
 
+## Screenshots
+
+<img height="300" alt="Categorize page" src="https://github.com/user-attachments/assets/6d9fe8fa-9879-43ef-82f6-2d98718010ce" />
+<img height="300" alt="Training page" src="https://github.com/user-attachments/assets/98951637-9627-49cd-8883-569772c6967d" />
+<img height="300" alt="Help page" src="https://github.com/user-attachments/assets/26174740-ab2c-475d-a986-88c64d8ae8ff" />
+<img height="300" alt="Config page" src="https://github.com/user-attachments/assets/2582b9df-4d91-48c2-897d-3c78d116f0ab" />
+
 ## How It Works
 
 The categorization order is fixed:
