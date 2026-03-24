@@ -1,6 +1,9 @@
 services:
-  firefly-categorizer:
-    image: fifcat/firefly-categorizer:latest
+  app:
+    image: fifcat/firefly-categorizer:dev
+    build:
+      context: .
+      dockerfile: Dockerfile
     restart: unless-stopped
     ports:
       - "8000:8000"
@@ -9,6 +12,7 @@ services:
       - FIREFLY_TOKEN=${FIREFLY_TOKEN}
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
     volumes:
+      - ./src:/app/src # Local application code for Docker-based development
       - ./config:/app/config # Application configuration, config.yaml
-      - ./data:/app/data  # Models and memory
+      - ./data:/app/data # Models and memory
       - ./logs:/app/logs # Application logs
