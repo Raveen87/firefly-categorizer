@@ -1,134 +1,263 @@
 # Firefly Categorizer
 
-A hybrid transaction categorization service for Firefly III.
+Firefly Categorizer is a FastAPI service that learns how you categorize transactions in Firefly III and applies that knowledge to future transactions.
 
-## Features
+It combines three approaches in a single pipeline:
 
-* **Three-way Classification**: Uses Memory (exact/fuzzy), TF-IDF (ML), and LLM (OpenAI) to categorize transactions.
-* **Continuous Learning**: Memorizes manual corrections and retrains the ML model on the fly.
-* **Web UI**: View recent transactions, see predictions, and manually confirm/correct categories.
-* **Webhook Support**: Ready to receive `TRIGGERED` events from Firefly III.
+- `Memory matcher` for exact and fuzzy matches on previously seen descriptions
+- `TF-IDF classifier` for learned text-based predictions from your training history
+- `OpenAI fallback` for optional last-resort categorization when local models cannot decide
+
+## What It Does
+
+- Trains on your existing categorized transactions in Firefly III
+- Suggests categories for uncategorized transactions in the web UI
+- Learns immediately from manual corrections and confirmations
+- Auto-approves high-confidence predictions when enabled
+- Accepts Firefly III webhooks to categorize new transactions as they are created
+- Persists learned state to disk so the service improves over time
+
+## How It Works
+
+The categorization order is fixed:
+
+1. `Memory matcher` checks for an exact or fuzzy match against transactions you have already confirmed.
+2. `TF-IDF classifier` predicts a category from previously learned training examples.
+3. `OpenAI fallback` is used only if `OPENAI_API_KEY` is configured and the local models do not produce a result.
+
+Accepted results are written back into the local memory and TF-IDF models, so every confirmed categorization improves future suggestions.
+
+## Quick Start
+
+### Recommended: Docker Compose
+
+The repository includes a production-oriented [`docker-compose.yml`](docker-compose.yml).
+
+1. Create or update a `.env` file with your environment values:
+
+   ```env
+   FIREFLY_URL=http://your-firefly-instance:8080
+   FIREFLY_TOKEN=ey...
+   OPENAI_API_KEY=sk-...
+   ```
+
+2. Start the service:
+
+   ```bash
+   docker compose up -d
+   ```
+
+3. Open `http://localhost:8000`.
+
+Mounted directories:
+
+- `./config` for `config.yaml`
+- `./data` for `memory.json` and `tfidf.pkl`
+- `./logs` for `app.log`
+
+### Local Development
+
+This project uses `uv` for dependency management and execution.
+
+1. Install the pinned tooling version if you use `mise`:
+
+   ```bash
+   mise install
+   ```
+
+2. Install dependencies:
+
+   ```bash
+   uv sync
+   ```
+
+3. Create `.env` from [`.env.example`](.env.example) or configure environment variables directly.
+
+4. Start the app:
+
+   ```bash
+   uv run python -m firefly_categorizer.main
+   ```
+
+5. Open `http://localhost:8000`.
+
+For a containerized local-code workflow that mounts your local `src/` tree into the container, use [`docker-compose_dev.yml`](docker-compose_dev.yml):
+
+```bash
+docker compose -f docker-compose_dev.yml up --build -d
+```
 
 ## Configuration
 
-You can configure settings via environment variables or the UI-backed `config/config.yaml` file.
-Environment variables take precedence and lock the corresponding field in the UI.
+Configuration is loaded in this order:
 
-### Option A: Environment variables
+1. Environment variables
+2. `.env`
+3. `config.yaml`
 
-1. Copy `.env.example` to `.env`. The application automatically loads `.env` on startup:
+Environment variables always win. If a value is supplied through the environment or `.env`, the corresponding field is shown as locked in the UI to avoid conflicting edits.
 
-    ```bash
-    cp .env.example .env
-    ```
+When `CONFIG_DIR` is set, the app loads:
 
-2. Set the following variables:
-    * `FIREFLY_URL`: The full URL to your Firefly III instance (e.g., `http://192.168.1.100:8080`).
-    * `FIREFLY_TOKEN`: Your Personal Access Token. Generate this in Firefly III under **Profile > OAuth / Personal Access Tokens > Create New Token**.
-    * `OPENAI_API_KEY`: (Optional) Your OpenAI API key if you want LLM fallback.
-    * `AUTO_APPROVE_THRESHOLD`: (Optional) Confidence threshold for auto-approval (0-1, 0 disables).
-    * `MANUAL_TAGS`: (Optional) Comma-separated tags to apply when you click Save.
-    * `AUTO_APPROVE_TAGS`: (Optional) Comma-separated tags to apply when auto-approval kicks in.
+- `CONFIG_DIR/.env`
+- `CONFIG_DIR/config.yaml`
 
-### Option B: config.yaml
+Otherwise it looks for:
 
-1. Open `config/config.yaml` and set the lowerCamelCase YAML values you want to use.
-2. Values in `config.yaml` only apply when the same environment variable (or `.env` entry) is not set.
-3. Example:
+- `.env` in the project root
+- `config/config.yaml`, falling back to `./config.yaml` if needed
 
-   ```yaml
-   firefly:
-     url: http://192.168.1.100:8080
-     token: ey...
+### Required for Firefly III integration
 
-   automation:
-     autoApproveThreshold: 0.9
-     manualTags: firefly-categorizer
-     autoApproveTags: firefly-categorizer,auto-approved
-   ```
+These are the minimum settings for useful operation:
 
-## Running
+- `FIREFLY_URL`
+- `FIREFLY_TOKEN`
 
-To assure the same verison of `uv` is used locally as in production, `mise` is recommended.
+Without them, the UI can still load, but Firefly III fetch/train/categorize actions are effectively disabled.
 
-Initialize the project by running:
+### Optional OpenAI fallback
 
-```bash
-mise install
+OpenAI is optional.
+
+If `OPENAI_API_KEY` is not set, the service still works with the local memory and TF-IDF classifiers. The OpenAI classifier is only used as a fallback when local models do not produce a result.
+
+### Configuration Reference
+
+| Environment variable | `config.yaml` key | Description |
+| --- | --- | --- |
+| `FIREFLY_URL` | `firefly.url` | Base URL for your Firefly III instance, without a trailing slash. |
+| `FIREFLY_TOKEN` | `firefly.token` | Personal Access Token from Firefly III. |
+| `FIREFLY_HTTP_TIMEOUT` | `firefly.httpTimeout` | Timeout for Firefly III API requests in seconds. |
+| `FIREFLY_CATEGORIES_TTL` | `firefly.categoriesTtl` | Category cache lifetime in seconds. `0` disables caching. |
+| `OPENAI_API_KEY` | `openai.apiKey` | API key for optional OpenAI fallback. |
+| `OPENAI_MODEL` | `openai.model` | Model name for the OpenAI-compatible client. |
+| `OPENAI_BASE_URL` | `openai.baseUrl` | Base URL override for OpenAI-compatible providers. |
+| `TRAINING_PAGE_SIZE` | `automation.trainingPageSize` | Number of Firefly III transactions fetched per training page. |
+| `AUTO_APPROVE_THRESHOLD` | `automation.autoApproveThreshold` | Confidence threshold from `0` to `1`. `0` disables auto-approve. |
+| `MANUAL_TAGS` | `automation.manualTags` | Comma-separated tags added on manual save. |
+| `AUTO_APPROVE_TAGS` | `automation.autoApproveTags` | Comma-separated tags added on auto-approve. |
+| `DATA_DIR` | `storage.dataDir` | Directory for persisted model artifacts such as `memory.json` and `tfidf.pkl`. |
+| `LOG_DIR` | `storage.logDir` | Directory for application logs. |
+| `LOG_LEVEL` | `logging.level` | Logging level: `DEBUG`, `INFO`, `WARNING`, `ERROR`, or `CRITICAL`. |
+| `CONFIG_DIR` | - | Directory containing `.env` and `config.yaml`. |
+
+### Example `config.yaml`
+
+The repository includes a starter file at [`config/config.yaml`](config/config.yaml).
+
+```yaml
+firefly:
+  url: http://192.168.1.100:8080
+  token: ey...
+  categoriesTtl: 60
+
+openai:
+  apiKey:
+  model: gpt-3.5-turbo
+  baseUrl:
+
+automation:
+  autoApproveThreshold: 0.9
+  trainingPageSize: 50
+  manualTags: firefly-categorizer
+  autoApproveTags: firefly-categorizer,auto-approved
+
+storage:
+  dataDir: ./data
+  logDir: ./logs
+
+logging:
+  level: INFO
 ```
 
-Without `mise`, `uv` must be installed manually before proceeding.
+## Typical Workflow
 
-1. Install dependencies:
+### 1. Train the models
 
-    ```bash
-    uv sync
-    ```
+Start by training on your existing categorized transactions in Firefly III. This gives the memory and TF-IDF models useful historical examples.
 
-2. Run the server:
+Notes:
 
-    ```bash
-    uv run python src/firefly_categorizer/main.py
-    ```
+- Only transactions with a category in Firefly III are used for training.
+- Training can be paused and resumed.
+- Previously seen transaction IDs are skipped when resuming within the same retained training state.
+- Retraining is recommended after you categorize a meaningful number of transactions outside this app.
 
-3. Open `http://localhost:8000` in your browser.
+### 2. Fetch transactions to review
 
-## Docker
+Use the main page to fetch a date range, or work through available transactions in order.
 
-1. Build and run with Docker Compose:
+By default, already categorized transactions may still be fetched from Firefly III, but they are hidden in the UI unless you enable `Show categorized`.
 
-    ```bash
-    docker-compose up --build -d
-    ```
+### 3. Run categorization
 
-2. Open `http://localhost:8000`.
+The service evaluates visible transactions and streams results back to the frontend as they are processed.
 
-The `/app/data` volume persists learned categories/models. `/app/logs` stores log files and
-`/app/config` is where the container-local `config.yaml` lives.
+For each suggested category, the UI shows:
 
-## Integration
+- the suggested category
+- the classifier that produced it
+- the confidence score
 
-* **Webhooks**: Configure Firefly III to send webhooks to `http://<your-ip>:8000/webhook/firefly` (JSON format).
+The OpenAI fallback currently reports a fixed confidence of `0.9`.
+
+### 4. Confirm or correct
+
+When you press `Save`, the accepted category is written back into the local memory and TF-IDF models immediately.
+
+If `AUTO_APPROVE_THRESHOLD` is greater than `0`, predictions at or above that threshold are approved automatically for both manual runs and webhook-triggered categorization.
+
+## Firefly III Webhook Setup
+
+To categorize transactions automatically as they are created, configure Firefly III to send webhooks to:
+
+```text
+http://<your-server>:8000/webhook/firefly
+```
+
+In Firefly III, create a webhook with:
+
+| Setting | Value |
+| --- | --- |
+| Trigger | `After transaction created` |
+| Response | `Transaction details` |
+| Delivery | `JSON` |
+
+If the app is running in Docker or on another machine, replace `localhost` with a host or IP that Firefly III can reach.
 
 ## Development
 
-This project uses **pytest** for tests, **ty** for type checking and **Ruff** for linting.
+All Python-related commands should be run with `uv`.
 
-### Testing
-
-To run the test suite:
+Required checks:
 
 ```bash
 uv run pytest
-```
-
-### Type Checking
-
-To run type checking:
-
-```bash
 uv run ty check
-```
-
-### Linting
-
-To check for linting issues:
-
-```bash
 uv run ruff check
 ```
 
-To automatically fix issues:
+Useful commands:
 
 ```bash
-uv run ruff check --fix
+uv sync
+uv run python -m firefly_categorizer.main
+uv run pytest
+uv run ty check
+uv run ruff check
 ```
+
+## Project Layout
+
+- [`src/firefly_categorizer/app.py`](src/firefly_categorizer/app.py) builds the FastAPI app and wires services and routes.
+- `src/firefly_categorizer/api/routes/` contains UI pages, transaction APIs, training endpoints, and the Firefly webhook route.
+- `src/firefly_categorizer/services/` orchestrates categorization, training, and Firefly III data access.
+- `src/firefly_categorizer/classifiers/` contains the memory, TF-IDF, and optional OpenAI classifiers.
+- `src/firefly_categorizer/integration/` contains the Firefly III HTTP client.
+- `src/firefly_categorizer/web/` contains Jinja2 templates and static assets.
+- [`tests/`](tests/) contains the pytest suite.
 
 ## Release
 
-Releases are created via the GitHub Actions **Release** workflow. It bumps the version, generates
-the changelog, builds and pushes the Docker image, tags the release, and creates a **draft** GitHub
-Release for manual editing.
-
-Note: if a draft release is deleted manually, the Git tag remains in the repository. If you need
-to undo a release after deleting the draft, delete the tag separately in Git.
+Releases are produced through the GitHub Actions `Release` workflow. It updates the version, generates the changelog, builds and publishes the Docker image, creates the Git tag, and opens a draft GitHub release for final editing.
