@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from typing import Any, cast
 
 from firefly_categorizer.core import configuration, settings
 
@@ -139,10 +140,11 @@ def test_load_environment_treats_blank_env_values_as_missing(
         assert not settings.is_env_override("FIREFLY_TOKEN")
 
         context = configuration.build_config_context()
+        sections = cast(list[dict[str, Any]], context["sections"])
         fields = {
-            field["key"]: field
-            for section in context["sections"]
-            for field in section["fields"]
+            cast(str, field["key"]): field
+            for section in sections
+            for field in cast(list[dict[str, Any]], section["fields"])
         }
         assert fields["FIREFLY_URL"]["disabled"] is False
         assert fields["FIREFLY_URL"]["value"] == "http://localhost:8080"
