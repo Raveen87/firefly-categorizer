@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 from firefly_categorizer.core import configuration, settings
@@ -103,6 +104,53 @@ def test_read_config_file_ignores_legacy_env_style_keys(tmp_path: Path) -> None:
     values = settings.read_config_file(str(config_path))
 
     assert values == {}
+
+
+def test_load_environment_treats_blank_env_values_as_missing(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(
+        "\n".join(
+            [
+                "firefly:",
+                "  url: http://localhost:8080",
+                "  token: config-token",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    original_config_path = settings._CONFIG_FILE_PATH  # noqa: SLF001
+    original_config_values = settings._CONFIG_FILE_VALUES.copy()  # noqa: SLF001
+    original_external_env_keys = settings._EXTERNAL_ENV_KEYS.copy()  # noqa: SLF001
+
+    try:
+        monkeypatch.setenv("CONFIG_DIR", str(tmp_path))
+        monkeypatch.setenv("FIREFLY_URL", "")
+        monkeypatch.setenv("FIREFLY_TOKEN", "  ")
+
+        settings.load_environment()
+
+        assert os.environ["FIREFLY_URL"] == "http://localhost:8080"
+        assert os.environ["FIREFLY_TOKEN"] == "config-token"
+        assert not settings.is_env_override("FIREFLY_URL")
+        assert not settings.is_env_override("FIREFLY_TOKEN")
+
+        context = configuration.build_config_context()
+        fields = {
+            field["key"]: field
+            for section in context["sections"]
+            for field in section["fields"]
+        }
+        assert fields["FIREFLY_URL"]["disabled"] is False
+        assert fields["FIREFLY_URL"]["value"] == "http://localhost:8080"
+        assert fields["FIREFLY_TOKEN"]["disabled"] is False
+    finally:
+        settings._CONFIG_FILE_PATH = original_config_path  # noqa: SLF001
+        settings._CONFIG_FILE_VALUES = original_config_values  # noqa: SLF001
+        settings._EXTERNAL_ENV_KEYS = original_external_env_keys  # noqa: SLF001
 
 
 def test_write_config_file_emits_nested_lower_camel_yaml(
