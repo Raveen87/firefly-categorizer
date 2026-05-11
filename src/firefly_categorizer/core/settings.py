@@ -60,6 +60,10 @@ _CONFIG_PATH_TO_KEY = {path: key for key, path in _CONFIG_KEY_PATHS.items()}
 _CONFIG_ROOT_KEYS = {path[0] for path in _CONFIG_KEY_PATHS.values()}
 
 
+def _is_provided_env_value(value: str | None) -> bool:
+    return value is not None and bool(value.strip())
+
+
 def _resolve_dotenv_path() -> str | None:
     config_dir = os.getenv("CONFIG_DIR")
     if config_dir:
@@ -159,13 +163,17 @@ def load_environment() -> None:
     if dotenv_path:
         load_dotenv(dotenv_path=dotenv_path, override=False)
 
-    _EXTERNAL_ENV_KEYS = set(os.environ.keys())
+    _EXTERNAL_ENV_KEYS = {
+        key
+        for key, value in os.environ.items()
+        if key not in _CONFIG_KEYS or _is_provided_env_value(value)
+    }
 
     _CONFIG_FILE_PATH = _resolve_config_path()
     _CONFIG_FILE_VALUES = read_config_file(_CONFIG_FILE_PATH)
 
     for key in _CONFIG_KEYS:
-        if key not in os.environ and key in _CONFIG_FILE_VALUES:
+        if not _is_provided_env_value(os.environ.get(key)) and key in _CONFIG_FILE_VALUES:
             os.environ[key] = _CONFIG_FILE_VALUES[key]
 
 
