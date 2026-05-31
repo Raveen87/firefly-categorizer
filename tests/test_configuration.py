@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 from firefly_categorizer.core import configuration, settings
@@ -103,6 +104,47 @@ def test_read_config_file_ignores_legacy_env_style_keys(tmp_path: Path) -> None:
     values = settings.read_config_file(str(config_path))
 
     assert values == {}
+
+
+def test_blank_environment_values_do_not_block_config_file_fallback(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(settings, "_CONFIG_FILE_PATH", settings._CONFIG_FILE_PATH)
+    monkeypatch.setattr(settings, "_CONFIG_FILE_VALUES", settings._CONFIG_FILE_VALUES)
+    monkeypatch.setattr(settings, "_EXTERNAL_ENV_KEYS", settings._EXTERNAL_ENV_KEYS)
+    for key in settings._CONFIG_KEYS:  # noqa: SLF001
+        monkeypatch.delenv(key, raising=False)
+
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    (config_dir / "config.yaml").write_text(
+        "\n".join(
+            [
+                "firefly:",
+                "  url: http://firefly.local",
+                "  token: config-token",
+                "openai:",
+                "  apiKey: config-openai-key",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("CONFIG_DIR", str(config_dir))
+    monkeypatch.setenv("FIREFLY_URL", "")
+    monkeypatch.setenv("FIREFLY_TOKEN", "   ")
+    monkeypatch.setenv("OPENAI_API_KEY", "")
+
+    settings.load_environment()
+
+    assert os.getenv("FIREFLY_URL") == "http://firefly.local"
+    assert os.getenv("FIREFLY_TOKEN") == "config-token"
+    assert os.getenv("OPENAI_API_KEY") == "config-openai-key"
+    assert not settings.is_env_override("FIREFLY_URL")
+    assert not settings.is_env_override("FIREFLY_TOKEN")
+    assert not settings.is_env_override("OPENAI_API_KEY")
 
 
 def test_write_config_file_emits_nested_lower_camel_yaml(
