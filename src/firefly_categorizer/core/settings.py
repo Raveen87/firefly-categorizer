@@ -159,6 +159,10 @@ def load_environment() -> None:
     if dotenv_path:
         load_dotenv(dotenv_path=dotenv_path, override=False)
 
+    for key in _CONFIG_KEYS:
+        if key in os.environ and not os.environ[key].strip():
+            os.environ.pop(key, None)
+
     _EXTERNAL_ENV_KEYS = set(os.environ.keys())
 
     _CONFIG_FILE_PATH = _resolve_config_path()
