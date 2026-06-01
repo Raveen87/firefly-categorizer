@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from firefly_categorizer.integration.firefly import FireflyClient, FireflyConfigurationError
+from firefly_categorizer.integration.firefly import FireflyClient, FireflyConfigurationError, FireflyFetchError
 
 
 def _categories_response(categories: list[dict[str, Any]]) -> MagicMock:
@@ -60,6 +60,35 @@ async def test_firefly_yield_transactions() -> None:
 
     assert len(pages[1][0]) == 1
     assert pages[1][0][0]["id"] == "2"
+
+
+@pytest.mark.anyio
+async def test_firefly_yield_transactions_raises_on_page_fetch_error() -> None:
+    client = FireflyClient(base_url="http://test", token="token")
+
+    page1_data = {
+        "data": [{"id": "1", "attributes": {"transactions": [{"description": "t1"}]}}],
+        "meta": {"pagination": {"total": 2, "total_pages": 2}},
+    }
+
+    with patch("httpx.AsyncClient") as mock_client_cls:
+        mock_client = AsyncMock()
+        mock_client.is_closed = False
+        mock_client_cls.return_value = mock_client
+
+        mock_resp1 = MagicMock()
+        mock_resp1.json.return_value = page1_data
+        mock_resp1.raise_for_status.return_value = None
+
+        mock_client.get = AsyncMock(side_effect=[mock_resp1, RuntimeError("boom")])
+
+        pages = []
+        with pytest.raises(FireflyFetchError, match="page 2"):
+            async for txs, meta in client.yield_transactions(limit_per_page=1):
+                pages.append((txs, meta))
+
+    assert len(pages) == 1
+    assert pages[0][0][0]["id"] == "1"
 
 
 @pytest.mark.anyio
@@ -308,6 +337,48 @@ async def test_train_endpoint_chunking() -> None:
 
 
 @pytest.mark.anyio
+async def test_train_bulk_propagates_firefly_page_fetch_errors() -> None:
+    from firefly_categorizer.services.training import TrainingManager
+
+    mock_firefly = MagicMock()
+    mock_service = MagicMock()
+
+    batch1 = (
+        [{
+            "id": "1",
+            "attributes": {
+                "transactions": [{
+                    "description": "t1",
+                    "category_name": "C1",
+                    "amount": 1.0,
+                    "date": "2024-01-01",
+                }],
+            },
+        }],
+        {"total": 2},
+    )
+
+    async def mock_generator(
+        limit_per_page: int = 500
+    ) -> AsyncGenerator[tuple[list[dict[str, Any]], dict[str, Any]], None]:
+        yield batch1
+        raise FireflyFetchError(2, RuntimeError("boom"))
+
+    mock_firefly.yield_transactions.side_effect = mock_generator
+
+    training_manager = TrainingManager(
+        service=mock_service,
+        firefly=mock_firefly,
+        page_size=500,
+    )
+
+    with pytest.raises(FireflyFetchError, match="page 2"):
+        await training_manager.train_bulk()
+
+    assert mock_service.learn.call_count == 1
+
+
+@pytest.mark.anyio
 async def test_training_stream_continues_after_client_disconnect() -> None:
     """Disconnecting SSE client should not cancel the running training job."""
     from firefly_categorizer.services.training import TrainingManager
@@ -383,6 +454,59 @@ async def test_training_stream_continues_after_client_disconnect() -> None:
     )
     assert training_manager.active is False
     assert mock_service.learn.call_count == 2
+
+
+@pytest.mark.anyio
+async def test_training_stream_reports_firefly_page_fetch_errors() -> None:
+    from firefly_categorizer.services.training import TrainingManager
+
+    mock_firefly = MagicMock()
+    mock_service = MagicMock()
+
+    batch1 = (
+        [{
+            "id": "1",
+            "attributes": {
+                "transactions": [{
+                    "description": "t1",
+                    "category_name": "C1",
+                    "amount": 1.0,
+                    "date": "2024-01-01",
+                }],
+            },
+        }],
+        {"total": 2},
+    )
+
+    async def mock_generator(
+        limit_per_page: int = 500,
+    ) -> AsyncGenerator[tuple[list[dict[str, Any]], dict[str, Any]], None]:
+        yield batch1
+        raise FireflyFetchError(2, RuntimeError("boom"))
+
+    mock_firefly.yield_transactions.side_effect = mock_generator
+
+    training_manager = TrainingManager(
+        service=mock_service,
+        firefly=mock_firefly,
+        page_size=500,
+    )
+
+    stream = training_manager.stream()
+    payloads = []
+    for _ in range(4):
+        event = await asyncio.wait_for(stream.__anext__(), timeout=1.0)
+        payload = json.loads(event.removeprefix("data: ").strip())
+        payloads.append(payload)
+        if payload.get("stage") == "error":
+            break
+
+    await stream.aclose()
+
+    assert payloads[-1]["stage"] == "error"
+    assert "page 2" in payloads[-1]["message"]
+    assert training_manager.get_status()["stage"] == "error"
+    assert mock_service.learn.call_count == 1
 
 
 @pytest.mark.anyio

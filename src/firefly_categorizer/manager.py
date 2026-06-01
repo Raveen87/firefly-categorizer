@@ -1,4 +1,5 @@
 import os
+import threading
 import time
 
 from firefly_categorizer.classifiers.base import Classifier
@@ -18,6 +19,7 @@ class CategorizerService:
                  data_dir: str = "."):
 
         self.classifiers: list[Classifier] = []
+        self._learn_lock = threading.RLock()
 
         # 1. Memory Matcher (Highest priority)
         self.memory = MemoryMatcher(
@@ -132,14 +134,16 @@ class CategorizerService:
         """
         Teach all trainable classifiers.
         """
-        # We update Memory and TF-IDF. LLM usually isn't updated this way (RAG/Fine-tuning is complex).
-        self.memory.learn(transaction, category)
-        self.tfidf.learn(transaction, category)
+        with self._learn_lock:
+            # We update Memory and TF-IDF. LLM usually isn't updated this way (RAG/Fine-tuning is complex).
+            self.memory.learn(transaction, category)
+            self.tfidf.learn(transaction, category)
 
     def clear_models(self) -> None:
         """
         Clear all local training data.
         """
-        self.memory.clear()
-        self.tfidf.clear()
+        with self._learn_lock:
+            self.memory.clear()
+            self.tfidf.clear()
         logger.info("All models cleared.")

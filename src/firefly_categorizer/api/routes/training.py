@@ -11,7 +11,7 @@ from firefly_categorizer.api.dependencies import (
 from firefly_categorizer.api.schemas import LearnRequest
 from firefly_categorizer.core import settings
 from firefly_categorizer.domain.tags import merge_tags
-from firefly_categorizer.integration.firefly import FireflyClient, FireflyConfigurationError
+from firefly_categorizer.integration.firefly import FireflyClient, FireflyConfigurationError, FireflyFetchError
 from firefly_categorizer.logger import get_logger
 from firefly_categorizer.manager import CategorizerService
 from firefly_categorizer.services.training import TrainingManager
@@ -29,6 +29,8 @@ async def train_models(
         return await training_manager.train_bulk()
     except FireflyConfigurationError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except FireflyFetchError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
 
 
 @router.get("/train-stream")
