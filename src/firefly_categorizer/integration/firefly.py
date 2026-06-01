@@ -19,6 +19,14 @@ class FireflyConfigurationError(RuntimeError):
     """Raised when Firefly API credentials are missing."""
 
 
+class FireflyFetchError(RuntimeError):
+    """Raised when Firefly pagination cannot fetch the next page."""
+
+    def __init__(self, page: int, cause: Exception) -> None:
+        self.page = page
+        super().__init__(f"Failed to fetch transactions page {page}: {cause}")
+
+
 def _safe_timestamp(value: str | None) -> float:
     if not value:
         return 0.0
@@ -323,7 +331,7 @@ class FireflyClient:
                 page += 1
             except Exception as exc:
                 logger.error("Error fetching transactions page %s: %s", page, exc)
-                break
+                raise FireflyFetchError(page, exc) from exc
 
         return {
             "transactions": all_transactions,
@@ -366,7 +374,7 @@ class FireflyClient:
                 page += 1
             except Exception as exc:
                 logger.error("Error fetching transactions page %s: %s", page, exc)
-                break
+                raise FireflyFetchError(page, exc) from exc
 
     async def stream_all_transactions(self, limit_per_page: int = 500) -> AsyncGenerator[dict[str, Any], None]:
         """Async generator that yields progress updates while fetching transactions."""

@@ -1,4 +1,7 @@
+import threading
+import time
 from collections.abc import Generator
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from unittest.mock import MagicMock, patch
 
@@ -59,3 +62,32 @@ def test_manager_orchestration_priority(mock_classifiers: tuple[MagicMock, Magic
     assert res is not None
     assert res.category.name == "LLMCat"
     assert res.source == "llm"
+
+
+def test_learn_serializes_classifier_updates(mock_classifiers: tuple[MagicMock, MagicMock, MagicMock]) -> None:
+    service = CategorizerService(data_dir=".")
+    active_learns = 0
+    max_active_learns = 0
+    counter_lock = threading.Lock()
+
+    def slow_memory_learn(transaction: Transaction, category: Category) -> None:
+        nonlocal active_learns, max_active_learns
+        with counter_lock:
+            active_learns += 1
+            max_active_learns = max(max_active_learns, active_learns)
+        time.sleep(0.005)
+        with counter_lock:
+            active_learns -= 1
+
+    service.memory.learn.side_effect = slow_memory_learn
+
+    def learn_one(index: int) -> None:
+        service.learn(
+            Transaction(description=f"Transaction {index}", amount=1.0, date=datetime.now()),
+            Category(name=f"Category {index % 2}"),
+        )
+
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        list(executor.map(learn_one, range(12)))
+
+    assert max_active_learns == 1

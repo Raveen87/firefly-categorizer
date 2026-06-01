@@ -8,7 +8,7 @@ from typing import Any
 
 from firefly_categorizer.domain.timefmt import format_duration
 from firefly_categorizer.domain.transactions import build_transaction_snapshot
-from firefly_categorizer.integration.firefly import FireflyClient, FireflyConfigurationError
+from firefly_categorizer.integration.firefly import FireflyClient, FireflyConfigurationError, FireflyFetchError
 from firefly_categorizer.logger import get_logger
 from firefly_categorizer.manager import CategorizerService
 from firefly_categorizer.models import Category
@@ -376,6 +376,15 @@ class TrainingManager:
             raise
         except FireflyConfigurationError as exc:
             logger.warning("[TRAIN] Training blocked by Firefly configuration: %s", exc)
+            self._publish_status(
+                {
+                    "stage": "error",
+                    "message": str(exc),
+                },
+                active=False,
+            )
+        except FireflyFetchError as exc:
+            logger.warning("[TRAIN] Training stopped by Firefly pagination failure: %s", exc)
             self._publish_status(
                 {
                     "stage": "error",
