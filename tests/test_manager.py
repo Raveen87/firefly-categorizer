@@ -3,6 +3,7 @@ import time
 from collections.abc import Generator
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
+from typing import Any, cast
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -79,7 +80,7 @@ def test_learn_serializes_classifier_updates(mock_classifiers: tuple[MagicMock, 
         with counter_lock:
             active_learns -= 1
 
-    service.memory.learn.side_effect = slow_memory_learn
+    cast(Any, service.memory.learn).side_effect = slow_memory_learn
 
     def learn_one(index: int) -> None:
         service.learn(
