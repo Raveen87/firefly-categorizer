@@ -6,6 +6,7 @@ const state = {
     totalPages: 1,
     totalTransactions: 0,
     renderScheduled: false,
-    isCategorizing: false
+    isCategorizing: false,
+    pendingSaves: new Set()
 };
 const dom = {};

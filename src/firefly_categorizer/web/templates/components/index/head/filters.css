@@ -95,4 +95,7 @@
     .select-input:disabled {
         background: var(--panel-soft);
         color: var(--muted);
+        cursor: not-allowed;
+        opacity: 0.5;
+        filter: grayscale(0.45);
     }

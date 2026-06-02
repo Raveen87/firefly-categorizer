@@ -6,6 +6,9 @@ function buildTransactionRow(transaction) {
     const isCategorized = transaction.existing_category ? true : false;
     const isProcessed = transaction.processed ? true : isCategorized;
     const transactionId = String(transaction.id);
+    const rowActionsDisabled = isCategorized
+        || state.isCategorizing
+        || state.pendingSaves.has(transactionId);
     const row = document.createElement('tr');
     row.dataset.transactionId = transactionId;
     row.className = `table-row${isCategorized ? ' is-categorized' : ''}${isProcessed ? ' is-processed' : ''}`;
@@ -20,7 +23,7 @@ function buildTransactionRow(transaction) {
         confidence = transaction.prediction.confidence.toFixed(2);
     }
 
-    const buttonClass = isCategorized ? 'btn btn-disabled btn-xs' : 'btn btn-primary btn-xs';
+    const buttonClass = rowActionsDisabled ? 'btn btn-disabled btn-xs' : 'btn btn-primary btn-xs';
     const dateCell = document.createElement('td');
     if (isProcessed) {
         const indicator = document.createElement('span');
@@ -81,7 +84,7 @@ function buildTransactionRow(transaction) {
     const select = document.createElement('select');
     select.id = `cat-${transactionId}`;
     select.className = 'select-input';
-    select.disabled = isCategorized;
+    select.disabled = rowActionsDisabled;
 
     const placeholderOption = document.createElement('option');
     placeholderOption.value = '';
@@ -101,7 +104,7 @@ function buildTransactionRow(transaction) {
     const saveButton = document.createElement('button');
     saveButton.id = `btn-${transactionId}`;
     saveButton.className = buttonClass;
-    saveButton.disabled = isCategorized;
+    saveButton.disabled = rowActionsDisabled;
     saveButton.textContent = 'Save';
     saveButton.addEventListener('click', () => saveTransaction(transactionId, predictedCat || ''));
 
@@ -113,6 +116,22 @@ function buildTransactionRow(transaction) {
     actionsCell.append(select, saveButton, rawInput);
     row.append(dateCell, descriptionCell, amountCell, categoryCell, confidenceCell, actionsCell);
     return row;
+}
+
+function setTransactionRowActionsDisabled(disable) {
+    dom.tbody.querySelectorAll('tr[data-transaction-id]').forEach(row => {
+        const transactionId = row.dataset.transactionId;
+        const transaction = state.transactions.find(t => String(t.id) === String(transactionId));
+        const shouldDisable = disable
+            || state.pendingSaves.has(String(transactionId))
+            || (transaction && transaction.existing_category ? true : false);
+        row.querySelectorAll('select[id^="cat-"], button[id^="btn-"]').forEach(control => {
+            control.disabled = shouldDisable;
+            if (control.tagName === 'BUTTON') {
+                control.className = shouldDisable ? 'btn btn-disabled btn-xs' : 'btn btn-primary btn-xs';
+            }
+        });
+    });
 }
 
 function updateDisplayedCountMeta() {
@@ -136,6 +155,10 @@ function updateTransactionRow(transactionId) {
     const escapedTransactionId = escapeCssAttributeValue(normalizedTransactionId);
     const existingRow = dom.tbody.querySelector(`tr[data-transaction-id="${escapedTransactionId}"]`);
     const showCategorized = dom.showCategorized.checked;
+
+    if (state.pendingSaves.has(normalizedTransactionId)) {
+        return;
+    }
 
     if (!shouldDisplayTransaction(transaction, showCategorized)) {
         if (existingRow) {

@@ -2,7 +2,7 @@ import asyncio
 
 from firefly_categorizer.core import settings
 from firefly_categorizer.domain.tags import merge_tags
-from firefly_categorizer.domain.transactions import TransactionSnapshot
+from firefly_categorizer.domain.transactions import TransactionSnapshot, build_transaction_snapshot
 from firefly_categorizer.integration.firefly import FireflyClient
 from firefly_categorizer.logger import get_logger
 from firefly_categorizer.manager import CategorizerService
@@ -167,6 +167,19 @@ class CategorizationPipeline:
 
         return prediction, existing_cat, auto_approved
 
+    async def _fetch_current_snapshot(
+        self,
+        transaction_id: str,
+    ) -> TransactionSnapshot | None:
+        current_transaction = await self.firefly.get_transaction(transaction_id)
+        if current_transaction is None:
+            logger.warning(
+                "[AUTO-APPROVE] Skipping transaction %s because its current state could not be verified.",
+                transaction_id,
+            )
+            return None
+        return build_transaction_snapshot(current_transaction)
+
     async def apply_auto_approval(
         self,
         transaction_id: str | int,
@@ -177,8 +190,23 @@ class CategorizationPipeline:
         include_existing_when_no_auto: bool = False,
         log_auto_approve: bool = True,
         threshold: float | None = None,
+        require_uncategorized: bool = True,
     ) -> bool:
         transaction_id_value = str(transaction_id)
+
+        if require_uncategorized:
+            current_snapshot = await self._fetch_current_snapshot(transaction_id_value)
+            if current_snapshot is None:
+                return False
+            if current_snapshot.category_name:
+                logger.info(
+                    "[AUTO-APPROVE] Skipping transaction %s because it is already categorized as '%s'.",
+                    transaction_id_value,
+                    current_snapshot.category_name,
+                )
+                return False
+            transaction = current_snapshot.transaction
+            existing_tags = current_snapshot.tags
 
         if log_auto_approve:
             threshold_value = threshold if threshold is not None else prediction.confidence

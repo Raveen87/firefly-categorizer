@@ -3,6 +3,14 @@
             if (!selectEl) return;
 
             const normalizedTransactionId = String(transactionId);
+            if (state.isCategorizing) {
+                alert('Please wait for categorization to finish before saving.');
+                return;
+            }
+            if (state.pendingSaves.has(normalizedTransactionId)) {
+                return;
+            }
+
             const categoryName = selectEl.value;
             const btn = document.getElementById(`btn-${transactionId}`);
             const transaction = state.transactions.find(t => String(t.id) === normalizedTransactionId);
@@ -17,6 +25,7 @@
 
             const spinnerHtml = `<div class="inline-spinner"></div>`;
 
+            state.pendingSaves.add(normalizedTransactionId);
             btn.disabled = true;
             selectEl.disabled = true;
             btn.innerHTML = spinnerHtml;
@@ -43,6 +52,16 @@
 
                 if (!response.ok) {
                     throw new Error(await readErrorMessage(response, 'Failed to save transaction.'));
+                }
+
+                const transactionIndex = state.transactions.findIndex(
+                    t => String(t.id) === normalizedTransactionId
+                );
+                if (transactionIndex !== -1) {
+                    state.transactions[transactionIndex].existing_category = categoryName;
+                    state.transactions[transactionIndex].prediction = null;
+                    state.transactions[transactionIndex].auto_approved = false;
+                    state.transactions[transactionIndex].processed = true;
                 }
 
                 const row = selectEl.closest('tr');
@@ -86,5 +105,7 @@
                 } else {
                     alert(error.message || 'Failed to save transaction.');
                 }
+            } finally {
+                state.pendingSaves.delete(normalizedTransactionId);
             }
         }
