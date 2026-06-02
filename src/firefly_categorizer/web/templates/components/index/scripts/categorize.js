@@ -10,6 +10,9 @@ function toggleControls(disable) {
     dom.paginationControls.forEach(el => {
         el.querySelectorAll('button').forEach(btn => btn.disabled = disable);
     });
+    if (typeof setTransactionRowActionsDisabled === 'function') {
+        setTransactionRowActionsDisabled(disable);
+    }
 }
 
 function runCategorization() {
@@ -17,6 +20,11 @@ function runCategorization() {
     if (categorizationSource) {
         categorizationSource.close();
         cleanupCategorization();
+        return;
+    }
+
+    if (state.pendingSaves.size > 0) {
+        alert('Please wait for pending saves to finish before running categorization.');
         return;
     }
 

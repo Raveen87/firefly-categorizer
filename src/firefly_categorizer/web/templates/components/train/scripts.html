@@ -29,6 +29,17 @@
                 </svg>
                 Training...
             `;
+        setClearButtonDisabled(true);
+    }
+
+    function setClearButtonDisabled(disabled) {
+        const clearBtn = document.getElementById('clear-btn');
+        if (!clearBtn) {
+            return;
+        }
+        clearBtn.disabled = disabled;
+        clearBtn.classList.toggle('opacity-50', disabled);
+        clearBtn.classList.toggle('cursor-not-allowed', disabled);
     }
 
     function setTrainButtonIdleLabel(label = 'Start Training') {
@@ -302,12 +313,18 @@
 
         const btn = document.getElementById('clear-btn');
         const originalText = btn.innerHTML;
+        let keepDisabled = false;
         btn.disabled = true;
         btn.textContent = "Clearing...";
 
         try {
             const response = await fetch('/clear-models', { method: 'POST' });
             const data = await response.json();
+            if (!response.ok) {
+                keepDisabled = response.status === 409;
+                alert(data.detail || data.message || 'Unable to clear models.');
+                return;
+            }
             if (data.status === 'success') {
                 alert('Models cleared successfully!');
             } else {
@@ -316,8 +333,8 @@
         } catch (e) {
             alert('Error: ' + e);
         } finally {
-            btn.disabled = false;
             btn.innerHTML = originalText;
+            setClearButtonDisabled(keepDisabled);
         }
     }
 
@@ -488,6 +505,7 @@
             menuBtn.classList.remove('opacity-50', 'cursor-not-allowed');
         }
         setPauseButtonState('idle');
+        setClearButtonDisabled(false);
     }
 
 

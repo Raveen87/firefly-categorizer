@@ -70,6 +70,8 @@ async def clear_models(
     service: Annotated[CategorizerService, Depends(get_service)],
     training_manager: Annotated[TrainingManager, Depends(get_training_manager)],
 ) -> dict[str, str]:
+    if training_manager.active:
+        raise HTTPException(status_code=409, detail="Training in progress")
     service.clear_models()
     training_manager.reset_state()
     return {"status": "success", "message": "All models cleared"}

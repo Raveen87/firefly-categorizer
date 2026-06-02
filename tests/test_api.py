@@ -1,5 +1,6 @@
 import asyncio
 from collections.abc import Generator
+from datetime import datetime
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
@@ -9,7 +10,7 @@ from fastapi.testclient import TestClient
 from firefly_categorizer.api.routes import pages
 from firefly_categorizer.integration.firefly import FireflyConfigurationError
 from firefly_categorizer.main import app
-from firefly_categorizer.models import CategorizationResult, Category
+from firefly_categorizer.models import CategorizationResult, Category, Transaction
 from firefly_categorizer.services.categorization import CategorizationPipeline
 
 client = TestClient(app)
@@ -169,6 +170,48 @@ def test_get_transactions_with_invalid_auto_approve_threshold(
     assert data["transactions"][0]["prediction"] is not None
 
 
+@pytest.mark.anyio
+async def test_auto_approval_skips_transaction_categorized_after_snapshot() -> None:
+    mock_firefly = AsyncMock()
+    mock_firefly.get_transaction.return_value = {
+        "id": "tx-1",
+        "attributes": {
+            "transactions": [{
+                "description": "coffee",
+                "amount": "12.50",
+                "date": "2023-01-01T10:00:00Z",
+                "category_name": "Manual",
+            }]
+        },
+    }
+
+    mock_service = MagicMock()
+    pipeline = CategorizationPipeline(service=mock_service, firefly=mock_firefly)
+    transaction = Transaction(
+        description="coffee",
+        amount=12.5,
+        date=datetime.fromisoformat("2023-01-01T10:00:00+00:00"),
+        currency="EUR",
+    )
+    prediction = CategorizationResult(
+        category=Category(name="Food"),
+        confidence=0.99,
+        source="mock",
+    )
+
+    success = await pipeline.apply_auto_approval(
+        "tx-1",
+        transaction,
+        prediction,
+        existing_tags=[],
+        threshold=0.8,
+    )
+
+    assert success is False
+    mock_firefly.update_transaction.assert_not_called()
+    mock_service.learn.assert_not_called()
+
+
 def test_get_transactions_missing_firefly_credentials(mock_firefly: AsyncMock) -> None:
     mock_firefly.get_categories.side_effect = FireflyConfigurationError(
         "Firefly API credentials are missing. Configure FIREFLY_URL and FIREFLY_TOKEN."
@@ -251,6 +294,34 @@ def test_train_models_missing_firefly_credentials(mock_training_manager: MagicMo
     assert response.json()["detail"] == (
         "Firefly API credentials are missing. Configure FIREFLY_URL and FIREFLY_TOKEN."
     )
+
+
+def test_clear_models_rejects_active_training(
+    mock_service: MagicMock,
+    mock_training_manager: MagicMock,
+) -> None:
+    mock_training_manager.active = True
+
+    response = client.post("/clear-models")
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == "Training in progress"
+    mock_service.clear_models.assert_not_called()
+    mock_training_manager.reset_state.assert_not_called()
+
+
+def test_clear_models_allows_idle_training_manager(
+    mock_service: MagicMock,
+    mock_training_manager: MagicMock,
+) -> None:
+    mock_training_manager.active = False
+
+    response = client.post("/clear-models")
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "success"
+    mock_service.clear_models.assert_called_once_with()
+    mock_training_manager.reset_state.assert_called_once_with()
 
 
 def test_learn_transaction_missing_firefly_credentials(
