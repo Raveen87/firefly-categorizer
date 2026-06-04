@@ -60,6 +60,13 @@ _CONFIG_PATH_TO_KEY = {path: key for key, path in _CONFIG_KEY_PATHS.items()}
 _CONFIG_ROOT_KEYS = {path[0] for path in _CONFIG_KEY_PATHS.values()}
 
 
+def _remove_blank_config_environment_values() -> None:
+    for key in _CONFIG_KEYS:
+        value = os.environ.get(key)
+        if value is not None and not value.strip():
+            os.environ.pop(key, None)
+
+
 def _resolve_dotenv_path() -> str | None:
     config_dir = os.getenv("CONFIG_DIR")
     if config_dir:
@@ -155,10 +162,13 @@ def load_environment() -> None:
     global _CONFIG_FILE_VALUES
     global _EXTERNAL_ENV_KEYS
 
+    _remove_blank_config_environment_values()
+
     dotenv_path = _resolve_dotenv_path()
     if dotenv_path:
         load_dotenv(dotenv_path=dotenv_path, override=False)
 
+    _remove_blank_config_environment_values()
     _EXTERNAL_ENV_KEYS = set(os.environ.keys())
 
     _CONFIG_FILE_PATH = _resolve_config_path()

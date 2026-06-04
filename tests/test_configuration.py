@@ -1,4 +1,6 @@
+import os
 from pathlib import Path
+from typing import Any, cast
 
 from firefly_categorizer.core import configuration, settings
 
@@ -103,6 +105,128 @@ def test_read_config_file_ignores_legacy_env_style_keys(tmp_path: Path) -> None:
     values = settings.read_config_file(str(config_path))
 
     assert values == {}
+
+
+def test_load_environment_treats_blank_env_values_as_missing_for_config_file(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    for key in settings._CONFIG_KEYS:  # noqa: SLF001
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.setattr(
+        settings,
+        "_CONFIG_FILE_PATH",
+        settings._CONFIG_FILE_PATH,  # noqa: SLF001
+    )
+    monkeypatch.setattr(
+        settings,
+        "_CONFIG_FILE_VALUES",
+        settings._CONFIG_FILE_VALUES.copy(),  # noqa: SLF001
+    )
+    monkeypatch.setattr(
+        settings,
+        "_EXTERNAL_ENV_KEYS",
+        settings._EXTERNAL_ENV_KEYS.copy(),  # noqa: SLF001
+    )
+
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    (config_dir / "config.yaml").write_text(
+        "\n".join(
+            [
+                "firefly:",
+                "  url: http://firefly.local",
+                "  token: config-token",
+                "openai:",
+                "  apiKey: config-openai-key",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setenv("CONFIG_DIR", str(config_dir))
+    monkeypatch.setenv("FIREFLY_URL", "")
+    monkeypatch.setenv("FIREFLY_TOKEN", "   ")
+    monkeypatch.setenv("OPENAI_API_KEY", "")
+
+    settings.load_environment()
+
+    assert os.getenv("FIREFLY_URL") == "http://firefly.local"
+    assert os.getenv("FIREFLY_TOKEN") == "config-token"
+    assert os.getenv("OPENAI_API_KEY") == "config-openai-key"
+    assert not settings.is_env_override("FIREFLY_URL")
+    assert not settings.is_env_override("FIREFLY_TOKEN")
+    assert not settings.is_env_override("OPENAI_API_KEY")
+
+    context = configuration.build_config_context()
+    sections = cast("list[dict[str, Any]]", context["sections"])
+    fields = {
+        field["key"]: field
+        for section in sections
+        for field in section["fields"]
+    }
+    assert fields["FIREFLY_URL"]["disabled"] is False
+    assert fields["FIREFLY_URL"]["value"] == "http://firefly.local"
+    assert fields["FIREFLY_TOKEN"]["disabled"] is False
+
+
+def test_load_environment_treats_blank_env_values_as_missing_for_dotenv(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    for key in settings._CONFIG_KEYS:  # noqa: SLF001
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.setattr(
+        settings,
+        "_CONFIG_FILE_PATH",
+        settings._CONFIG_FILE_PATH,  # noqa: SLF001
+    )
+    monkeypatch.setattr(
+        settings,
+        "_CONFIG_FILE_VALUES",
+        settings._CONFIG_FILE_VALUES.copy(),  # noqa: SLF001
+    )
+    monkeypatch.setattr(
+        settings,
+        "_EXTERNAL_ENV_KEYS",
+        settings._EXTERNAL_ENV_KEYS.copy(),  # noqa: SLF001
+    )
+
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    (config_dir / ".env").write_text(
+        "\n".join(
+            [
+                "FIREFLY_URL=http://dotenv-firefly.local",
+                "FIREFLY_TOKEN=dotenv-token",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    (config_dir / "config.yaml").write_text(
+        "\n".join(
+            [
+                "firefly:",
+                "  url: http://config-firefly.local",
+                "  token: config-token",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setenv("CONFIG_DIR", str(config_dir))
+    monkeypatch.setenv("FIREFLY_URL", "")
+    monkeypatch.setenv("FIREFLY_TOKEN", "   ")
+
+    settings.load_environment()
+
+    assert os.getenv("FIREFLY_URL") == "http://dotenv-firefly.local"
+    assert os.getenv("FIREFLY_TOKEN") == "dotenv-token"
+    assert settings.is_env_override("FIREFLY_URL")
+    assert settings.is_env_override("FIREFLY_TOKEN")
 
 
 def test_write_config_file_emits_nested_lower_camel_yaml(
