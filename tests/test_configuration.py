@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from typing import Any, cast
 
 from firefly_categorizer.core import configuration, settings
 
@@ -159,9 +160,10 @@ def test_load_environment_treats_blank_env_values_as_missing_for_config_file(
     assert not settings.is_env_override("OPENAI_API_KEY")
 
     context = configuration.build_config_context()
+    sections = cast("list[dict[str, Any]]", context["sections"])
     fields = {
         field["key"]: field
-        for section in context["sections"]
+        for section in sections
         for field in section["fields"]
     }
     assert fields["FIREFLY_URL"]["disabled"] is False
