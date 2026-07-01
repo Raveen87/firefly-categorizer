@@ -1,5 +1,8 @@
 from collections.abc import Generator
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
+from threading import Lock
+from time import sleep
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -59,3 +62,40 @@ def test_manager_orchestration_priority(mock_classifiers: tuple[MagicMock, Magic
     assert res is not None
     assert res.category.name == "LLMCat"
     assert res.source == "llm"
+
+
+def test_learn_serializes_model_mutations(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+
+    service = CategorizerService(data_dir=str(tmp_path))
+    active_learns = 0
+    max_active_learns = 0
+    counter_lock = Lock()
+
+    def slow_memory_learn(_transaction: Transaction, _category: Category) -> None:
+        nonlocal active_learns, max_active_learns
+        with counter_lock:
+            active_learns += 1
+            max_active_learns = max(max_active_learns, active_learns)
+        sleep(0.05)
+        with counter_lock:
+            active_learns -= 1
+
+    monkeypatch.setattr(service.memory, "learn", slow_memory_learn)
+    monkeypatch.setattr(service.tfidf, "learn", lambda _transaction, _category: None)
+
+    transactions = [
+        Transaction(description="Store A", amount=10.0, date=datetime.now()),
+        Transaction(description="Store B", amount=20.0, date=datetime.now()),
+    ]
+    category = Category(name="Groceries")
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        futures = [
+            executor.submit(service.learn, transaction, category)
+            for transaction in transactions
+        ]
+        for future in futures:
+            future.result()
+
+    assert max_active_learns == 1
