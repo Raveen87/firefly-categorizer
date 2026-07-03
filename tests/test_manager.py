@@ -1,5 +1,8 @@
+import time
 from collections.abc import Generator
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
+from threading import Event, Lock
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -59,3 +62,49 @@ def test_manager_orchestration_priority(mock_classifiers: tuple[MagicMock, Magic
     assert res is not None
     assert res.category.name == "LLMCat"
     assert res.source == "llm"
+
+
+def test_learn_serializes_model_mutation(mock_classifiers: tuple[MagicMock, MagicMock, MagicMock]) -> None:
+    mock_mem_cls, mock_tfidf_cls, _ = mock_classifiers
+    mem_instance = mock_mem_cls.return_value
+    tfidf_instance = mock_tfidf_cls.return_value
+    service = CategorizerService(data_dir=".")
+
+    first_learn_entered = Event()
+    active_learns_lock = Lock()
+    active_learns = 0
+    overlapping_learn_detected = False
+
+    def blocking_memory_learn(_transaction: Transaction, _category: Category) -> None:
+        nonlocal active_learns
+        nonlocal overlapping_learn_detected
+
+        with active_learns_lock:
+            if active_learns:
+                overlapping_learn_detected = True
+            active_learns += 1
+        first_learn_entered.set()
+
+        try:
+            time.sleep(0.05)
+        finally:
+            with active_learns_lock:
+                active_learns -= 1
+
+    mem_instance.learn.side_effect = blocking_memory_learn
+
+    first_transaction = Transaction(description="first", amount=1.0, date=datetime.now())
+    second_transaction = Transaction(description="second", amount=2.0, date=datetime.now())
+    category = Category(name="Food")
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        first_future = executor.submit(service.learn, first_transaction, category)
+        assert first_learn_entered.wait(timeout=1.0)
+        second_future = executor.submit(service.learn, second_transaction, category)
+
+        first_future.result(timeout=1.0)
+        second_future.result(timeout=1.0)
+
+    assert not overlapping_learn_detected
+    assert mem_instance.learn.call_count == 2
+    assert tfidf_instance.learn.call_count == 2

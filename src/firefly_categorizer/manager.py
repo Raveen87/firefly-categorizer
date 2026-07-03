@@ -1,5 +1,6 @@
 import os
 import time
+from threading import RLock
 
 from firefly_categorizer.classifiers.base import Classifier
 from firefly_categorizer.classifiers.llm import LLMClassifier
@@ -17,6 +18,7 @@ class CategorizerService:
                  tfidf_threshold: float = 0.5,
                  data_dir: str = "."):
 
+        self._model_lock = RLock()
         self.classifiers: list[Classifier] = []
 
         # 1. Memory Matcher (Highest priority)
@@ -47,26 +49,27 @@ class CategorizerService:
             logger.warning("OPENAI_API_KEY not found. LLM classifier disabled.")
 
     def refresh_llm(self) -> None:
-        self.classifiers = [
-            classifier
-            for classifier in self.classifiers
-            if not isinstance(classifier, LLMClassifier)
-        ]
+        with self._model_lock:
+            self.classifiers = [
+                classifier
+                for classifier in self.classifiers
+                if not isinstance(classifier, LLMClassifier)
+            ]
 
-        api_key = settings.get_env_text("OPENAI_API_KEY")
-        if api_key:
-            model = settings.get_env_text("OPENAI_MODEL", "gpt-3.5-turbo")
-            base_url = settings.get_env_url("OPENAI_BASE_URL")
-            self.llm = LLMClassifier(api_key=api_key, model=model, base_url=base_url)
-            self.classifiers.append(self.llm)
-            logger.info(
-                "LLM Classifier refreshed: model=%s, base_url=%s",
-                model,
-                base_url or "default",
-            )
-        else:
-            self.llm = None
-            logger.info("OPENAI_API_KEY not found. LLM classifier disabled.")
+            api_key = settings.get_env_text("OPENAI_API_KEY")
+            if api_key:
+                model = settings.get_env_text("OPENAI_MODEL", "gpt-3.5-turbo")
+                base_url = settings.get_env_url("OPENAI_BASE_URL")
+                self.llm = LLMClassifier(api_key=api_key, model=model, base_url=base_url)
+                self.classifiers.append(self.llm)
+                logger.info(
+                    "LLM Classifier refreshed: model=%s, base_url=%s",
+                    model,
+                    base_url or "default",
+                )
+            else:
+                self.llm = None
+                logger.info("OPENAI_API_KEY not found. LLM classifier disabled.")
 
     def categorize(
         self, transaction: Transaction, valid_categories: list[str] | None = None
@@ -83,26 +86,27 @@ class CategorizerService:
         error: Exception | None = None
 
         try:
-            for classifier in self.classifiers:
-                classifier_name = classifier.__class__.__name__
-                logger.debug(f"Trying {classifier_name} for: '{transaction.description[:50]}...'")
+            with self._model_lock:
+                for classifier in self.classifiers:
+                    classifier_name = classifier.__class__.__name__
+                    logger.debug(f"Trying {classifier_name} for: '{transaction.description[:50]}...'")
 
-                start_classifier = time.perf_counter()
-                try:
-                    result = classifier.classify(transaction, valid_categories=valid_categories)
-                finally:
-                    duration_ms = (time.perf_counter() - start_classifier) * 1000
-                    logger.info("[CATEGORIZE] %s took %.2fms", classifier_name, duration_ms)
+                    start_classifier = time.perf_counter()
+                    try:
+                        result = classifier.classify(transaction, valid_categories=valid_categories)
+                    finally:
+                        duration_ms = (time.perf_counter() - start_classifier) * 1000
+                        logger.info("[CATEGORIZE] %s took %.2fms", classifier_name, duration_ms)
 
-                if result:
-                    logger.debug(
-                        f"{classifier_name} returned: '{result.category.name}' "
-                        f"(confidence: {result.confidence:.2f})"
-                    )
-                    matched_classifier = classifier_name
-                    break
-                else:
-                    logger.debug(f"{classifier_name} returned: None")
+                    if result:
+                        logger.debug(
+                            f"{classifier_name} returned: '{result.category.name}' "
+                            f"(confidence: {result.confidence:.2f})"
+                        )
+                        matched_classifier = classifier_name
+                        break
+                    else:
+                        logger.debug(f"{classifier_name} returned: None")
         except Exception as exc:
             error = exc
             raise
@@ -132,14 +136,16 @@ class CategorizerService:
         """
         Teach all trainable classifiers.
         """
-        # We update Memory and TF-IDF. LLM usually isn't updated this way (RAG/Fine-tuning is complex).
-        self.memory.learn(transaction, category)
-        self.tfidf.learn(transaction, category)
+        with self._model_lock:
+            # We update Memory and TF-IDF. LLM usually isn't updated this way (RAG/Fine-tuning is complex).
+            self.memory.learn(transaction, category)
+            self.tfidf.learn(transaction, category)
 
     def clear_models(self) -> None:
         """
         Clear all local training data.
         """
-        self.memory.clear()
-        self.tfidf.clear()
+        with self._model_lock:
+            self.memory.clear()
+            self.tfidf.clear()
         logger.info("All models cleared.")
