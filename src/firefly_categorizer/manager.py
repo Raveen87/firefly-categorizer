@@ -71,6 +71,10 @@ class CategorizerService:
     def categorize(
         self, transaction: Transaction, valid_categories: list[str] | None = None
     ) -> CategorizationResult | None:
+        if valid_categories is not None and not valid_categories:
+            logger.info("[CATEGORIZE] No valid categories available; skipping categorization.")
+            return None
+
         logger.debug(
             "[CATEGORIZE] Starting categorization for transaction: '%s' (amount: %.2f %s)",
             transaction.description[:100],

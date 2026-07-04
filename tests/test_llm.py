@@ -31,3 +31,17 @@ def test_llm_classify(mock_openai_client: MagicMock) -> None:
 
     # Verify call
     mock_instance.responses.create.assert_called_once()
+
+
+def test_llm_empty_valid_categories_returns_none_without_request(
+    mock_openai_client: MagicMock,
+) -> None:
+    mock_instance = mock_openai_client.return_value
+
+    classifier = LLMClassifier(api_key="sk-fake", model="gpt-4")
+    t = Transaction(description="Whole Foods", amount=100.0, date=datetime.now())
+
+    res = classifier.classify(t, valid_categories=[])
+
+    assert res is None
+    mock_instance.responses.create.assert_not_called()
