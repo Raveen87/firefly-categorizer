@@ -20,8 +20,11 @@ class LLMClassifier(Classifier):
         self, transaction: Transaction, valid_categories: list[str] | None = None
     ) -> CategorizationResult | None:
         try:
+            if valid_categories is not None and not valid_categories:
+                return None
+
             prompt_categories = ""
-            if valid_categories:
+            if valid_categories is not None:
                 cats_str = ", ".join(valid_categories)
                 prompt_categories = f"\nUse ONLY one of the following categories: {cats_str}"
 
@@ -47,9 +50,8 @@ class LLMClassifier(Classifier):
                 return None
             category_name = category_name.strip()
 
-            if valid_categories:
-                if category_name not in valid_categories:
-                    return None
+            if valid_categories is not None and category_name not in valid_categories:
+                return None
 
             # Simple heuristic for confidence (LLMs are usually confident)
             return CategorizationResult(

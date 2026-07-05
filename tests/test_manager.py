@@ -59,3 +59,22 @@ def test_manager_orchestration_priority(mock_classifiers: tuple[MagicMock, Magic
     assert res is not None
     assert res.category.name == "LLMCat"
     assert res.source == "llm"
+
+
+def test_manager_empty_valid_categories_skips_classifiers(
+    mock_classifiers: tuple[MagicMock, MagicMock, MagicMock],
+) -> None:
+    mock_mem_cls, mock_tfidf_cls, mock_llm_cls = mock_classifiers
+    mem_instance = mock_mem_cls.return_value
+    tfidf_instance = mock_tfidf_cls.return_value
+    llm_instance = mock_llm_cls.return_value
+
+    service = CategorizerService(data_dir=".")
+    t = Transaction(description="Test", amount=10.0, date=datetime.now())
+
+    res = service.categorize(t, valid_categories=[])
+
+    assert res is None
+    mem_instance.classify.assert_not_called()
+    tfidf_instance.classify.assert_not_called()
+    llm_instance.classify.assert_not_called()
