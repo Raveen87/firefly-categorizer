@@ -24,7 +24,7 @@ async def categorize_transaction(
     pipeline: Annotated[CategorizationPipeline, Depends(get_pipeline)],
     firefly: Annotated[FireflyClient | None, Depends(get_firefly_optional)],
 ) -> CategorizationResult | None:
-    valid_cats = None
+    valid_cats: list[str] | None = None
     if firefly:
         try:
             categories = await fetch_category_names(firefly, raise_on_error=True)
@@ -35,8 +35,7 @@ async def categorize_transaction(
                 status_code=502,
                 detail=f"Error fetching categories: {exc!r}",
             ) from exc
-        if categories:
-            valid_cats = categories
+        valid_cats = categories
 
     return await pipeline.predict(req.transaction, valid_categories=valid_cats)
 

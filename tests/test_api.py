@@ -132,6 +132,47 @@ def test_get_transactions_with_predict(
     assert data["transactions"][0]["prediction"]["category"]["name"] == "Food"
 
 
+def test_get_transactions_with_empty_categories_skips_prediction_and_auto_approve(
+    mock_firefly: AsyncMock,
+    mock_service: MagicMock,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("AUTO_APPROVE_THRESHOLD", "0.5")
+    mock_firefly.get_categories.return_value = []
+    mock_firefly.get_transactions.return_value = {
+        "data": [
+            {
+                "id": "1",
+                "attributes": {
+                    "transactions": [{
+                        "description": "uncategorized tx",
+                        "amount": "10.00",
+                        "date": "2023-01-01T10:00:00Z",
+                        "category_name": None
+                    }]
+                }
+            }
+        ],
+        "meta": {"total": 1}
+    }
+    mock_service.categorize.return_value = CategorizationResult(
+        category=Category(name="Food"),
+        confidence=0.9,
+        source="mock",
+    )
+
+    response = client.get("/api/transactions?predict=true")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data["transactions"]) == 1
+    assert data["transactions"][0]["prediction"] is None
+    assert data["transactions"][0]["existing_category"] is None
+    assert data["transactions"][0]["auto_approved"] is False
+    mock_service.categorize.assert_not_called()
+    mock_firefly.update_transaction.assert_not_called()
+
+
 def test_get_transactions_with_invalid_auto_approve_threshold(
     mock_firefly: AsyncMock,
     mock_service: MagicMock,
@@ -207,6 +248,67 @@ def test_categorize_missing_firefly_credentials(
         "Firefly API credentials are missing. Configure FIREFLY_URL and FIREFLY_TOKEN."
     )
     mock_service.categorize.assert_not_called()
+
+
+def test_categorize_empty_firefly_categories_returns_no_prediction(
+    mock_firefly: AsyncMock,
+    mock_service: MagicMock,
+) -> None:
+    mock_firefly.get_categories.return_value = []
+    mock_service.categorize.return_value = CategorizationResult(
+        category=Category(name="Food"),
+        confidence=0.9,
+        source="mock",
+    )
+
+    response = client.post(
+        "/categorize",
+        json={
+            "transaction": {
+                "description": "coffee",
+                "amount": 12.5,
+                "date": "2023-01-01T10:00:00Z",
+                "currency": "EUR",
+            }
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json() is None
+    mock_service.categorize.assert_not_called()
+
+
+def test_webhook_empty_firefly_categories_does_not_auto_approve(
+    mock_firefly: AsyncMock,
+    mock_service: MagicMock,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("AUTO_APPROVE_THRESHOLD", "0.5")
+    mock_firefly.get_categories.return_value = []
+    mock_service.categorize.return_value = CategorizationResult(
+        category=Category(name="Food"),
+        confidence=0.9,
+        source="mock",
+    )
+
+    response = client.post(
+        "/webhook/firefly",
+        json={
+            "transaction_id": "tx-1",
+            "transactions": [{
+                "description": "coffee",
+                "amount": "12.50",
+                "date": "2023-01-01T10:00:00Z",
+                "category_name": None,
+                "tags": ["existing"],
+            }],
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "ignored", "reason": "no prediction"}
+    mock_service.categorize.assert_not_called()
+    mock_firefly.update_transaction.assert_not_called()
 
 
 def test_get_categories(mock_firefly: AsyncMock) -> None:

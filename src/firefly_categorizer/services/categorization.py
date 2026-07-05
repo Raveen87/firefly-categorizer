@@ -26,6 +26,10 @@ class CategorizationPipeline:
         *,
         valid_categories: list[str] | None = None,
     ) -> CategorizationResult | None:
+        if valid_categories is not None and not valid_categories:
+            logger.info("[CATEGORIZE] No valid categories available; skipping prediction.")
+            return None
+
         return await asyncio.to_thread(
             self.service.categorize,
             transaction,
