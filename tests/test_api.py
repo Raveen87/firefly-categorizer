@@ -169,6 +169,106 @@ def test_get_transactions_with_invalid_auto_approve_threshold(
     assert data["transactions"][0]["prediction"] is not None
 
 
+def test_get_transactions_empty_categories_block_auto_approve(
+    mock_firefly: AsyncMock,
+    mock_service: MagicMock,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("AUTO_APPROVE_THRESHOLD", "0.5")
+    mock_firefly.get_categories.return_value = []
+    mock_firefly.update_transaction.return_value = True
+    mock_firefly.get_transactions.return_value = {
+        "data": [
+            {
+                "id": "1",
+                "attributes": {
+                    "transactions": [{
+                        "description": "uncategorized tx",
+                        "amount": "10.00",
+                        "date": "2023-01-01T10:00:00Z",
+                        "category_name": None
+                    }]
+                }
+            }
+        ],
+        "meta": {"total": 1}
+    }
+
+    def categorize_with_constraints(
+        _transaction: Any,
+        valid_categories: list[str] | None = None,
+    ) -> CategorizationResult | None:
+        if valid_categories is not None and not valid_categories:
+            return None
+        return CategorizationResult(
+            category=Category(name="StaleCategory"),
+            confidence=1.0,
+            source="mock",
+        )
+
+    mock_service.categorize.side_effect = categorize_with_constraints
+
+    response = client.get("/api/transactions?predict=true")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data["transactions"]) == 1
+    assert data["transactions"][0]["prediction"] is None
+    assert data["transactions"][0]["auto_approved"] is False
+    assert mock_service.categorize.call_args.kwargs["valid_categories"] == []
+    mock_firefly.update_transaction.assert_not_called()
+    mock_service.learn.assert_not_called()
+
+
+def test_categorize_stream_empty_categories_block_auto_approve(
+    mock_firefly: AsyncMock,
+    mock_service: MagicMock,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("AUTO_APPROVE_THRESHOLD", "0.5")
+    mock_firefly.get_categories.return_value = []
+    mock_firefly.update_transaction.return_value = True
+    mock_firefly.get_transactions.return_value = {
+        "data": [
+            {
+                "id": "1",
+                "attributes": {
+                    "transactions": [{
+                        "description": "uncategorized tx",
+                        "amount": "10.00",
+                        "date": "2023-01-01T10:00:00Z",
+                        "category_name": None
+                    }]
+                }
+            }
+        ],
+        "meta": {"total": 1}
+    }
+
+    def categorize_with_constraints(
+        _transaction: Any,
+        valid_categories: list[str] | None = None,
+    ) -> CategorizationResult | None:
+        if valid_categories is not None and not valid_categories:
+            return None
+        return CategorizationResult(
+            category=Category(name="StaleCategory"),
+            confidence=1.0,
+            source="mock",
+        )
+
+    mock_service.categorize.side_effect = categorize_with_constraints
+
+    response = client.get("/api/categorize-stream")
+
+    assert response.status_code == 200
+    assert '"auto_approved": false' in response.text
+    assert '"prediction": null' in response.text
+    assert mock_service.categorize.call_args.kwargs["valid_categories"] == []
+    mock_firefly.update_transaction.assert_not_called()
+    mock_service.learn.assert_not_called()
+
+
 def test_get_transactions_missing_firefly_credentials(mock_firefly: AsyncMock) -> None:
     mock_firefly.get_categories.side_effect = FireflyConfigurationError(
         "Firefly API credentials are missing. Configure FIREFLY_URL and FIREFLY_TOKEN."
@@ -207,6 +307,56 @@ def test_categorize_missing_firefly_credentials(
         "Firefly API credentials are missing. Configure FIREFLY_URL and FIREFLY_TOKEN."
     )
     mock_service.categorize.assert_not_called()
+
+
+def test_webhook_empty_categories_block_auto_approve(
+    mock_firefly: AsyncMock,
+    mock_service: MagicMock,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("AUTO_APPROVE_THRESHOLD", "0.5")
+    mock_firefly.get_categories.return_value = []
+    mock_firefly.update_transaction.return_value = True
+
+    def categorize_with_constraints(
+        _transaction: Any,
+        valid_categories: list[str] | None = None,
+    ) -> CategorizationResult | None:
+        if valid_categories is not None and not valid_categories:
+            return None
+        return CategorizationResult(
+            category=Category(name="StaleCategory"),
+            confidence=1.0,
+            source="mock",
+        )
+
+    mock_service.categorize.side_effect = categorize_with_constraints
+
+    response = client.post(
+        "/webhook/firefly",
+        json={
+            "event": "transaction_created",
+            "data": {
+                "id": "tx-1",
+                "attributes": {
+                    "transactions": [
+                        {
+                            "description": "uncategorized tx",
+                            "amount": "10.00",
+                            "date": "2023-01-01T10:00:00Z",
+                            "category_name": None,
+                        }
+                    ],
+                },
+            },
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "ignored", "reason": "no prediction"}
+    assert mock_service.categorize.call_args.kwargs["valid_categories"] == []
+    mock_firefly.update_transaction.assert_not_called()
+    mock_service.learn.assert_not_called()
 
 
 def test_get_categories(mock_firefly: AsyncMock) -> None:
