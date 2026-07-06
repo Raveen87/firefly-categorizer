@@ -73,7 +73,7 @@ async def categorize_stream(
             snapshot = build_transaction_snapshot(t_data)
             prediction, existing_cat, auto_approved = await pipeline.predict_for_snapshot(
                 snapshot,
-                valid_categories=category_list if category_list else None,
+                valid_categories=category_list,
                 auto_approve_threshold=auto_approve_threshold,
             )
 
@@ -153,7 +153,7 @@ async def get_transactions(
                 if predict and service and pipeline:
                     prediction, existing_cat, auto_approved = await pipeline.predict_for_snapshot(
                         snapshot,
-                        valid_categories=category_list if category_list else None,
+                        valid_categories=category_list,
                         auto_approve_threshold=auto_approve_threshold,
                     )
 
